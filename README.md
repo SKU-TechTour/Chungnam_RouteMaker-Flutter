@@ -2,10 +2,50 @@
 
 > **Frontend**: Flutter (MVVM + Feature-first)  
 > **Backend**: Spring (DDD / Layered Architecture)  
-> **Repository**: [SKU-TechTour/Chungnam_RouteMaker-Flutter](https://github.com/SKU-TechTour/Chungnam_RouteMaker-Flutter)
 
 ---
+## Github Guidline
 
+| Prefix | 용도 | 예시 상황 |
+|--------|------|-----------|
+| `feat` | 새로운 기능(Feature) 추가 | API, 비즈니스 로직, 스케줄러 등 **동작이 추가**될 때 |
+| `fix` | 버그·에러 수정(Fix) | 잘못된 동작, 장애, 데이터 오류 등 **문제 해결** |
+| `chore` | 빌드·인프라·설정 | 패키지, 환경 변수, 키 파일, Gradle 등 **기능과 무관한 유지보수** |
+| `docs` | 문서(Documentation) | README, API 명세, 아키텍처 문서 등 |
+| `refactor` | 구조 개선(Refactor) | **기능은 동일**, 코드 정리·분리·이름 변경 |
+| `style` | 포맷·린트 | 세미콜론, import 정리 등 **로직 변경 없음** |
+
+#### feat — 새 기능
+
+```
+feat: 맞춤형 3단 코스 추천 API 추가
+```
+
+#### fix — 버그 수정
+
+```
+fix: JWT 만료 시 401 대신 500이 반환되던 문제 수정
+```
+
+#### chore — 설정 변경
+
+```
+chore: Redis Docker Compose 설정 추가
+```
+
+#### docs — 문서
+
+```
+docs: Spring 아키텍처 및 Flutter 연동 가이드 README 추가
+```
+
+#### refactor — 구조 개선 (기능 동일)
+
+```
+refactor: PlaceService 필터 로직을 PlaceFilterService로 분리
+```
+
+---
 ## 1. 아키텍처 개요
 
 이 프로젝트는 **MVVM(Model-View-ViewModel)** 패턴을 기반으로, 화면(스토리보드) 단위로 모듈을 나눈 **Feature-first** 구조를 사용합니다.
