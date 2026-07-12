@@ -1,36 +1,57 @@
 import 'package:go_router/go_router.dart';
+import 'package:flutterprojects/features/splash/views/splash_screen.dart';
+import 'package:flutterprojects/features/onboarding/views/onboarding_screen.dart';
+import 'package:flutterprojects/features/auth/views/login_screen.dart';
 import 'package:flutterprojects/features/home_curation/views/home_screen.dart';
+import 'package:flutterprojects/features/home_curation/views/main_shell.dart';
 import 'package:flutterprojects/features/map_search/views/map_screen.dart';
+import 'package:flutterprojects/features/saved/views/saved_screen.dart';
+import 'package:flutterprojects/features/my_history/views/my_history_screen.dart';
 import 'package:flutterprojects/features/my_history/views/receipt_share_screen.dart';
 import 'package:flutterprojects/features/my_history/views/stamp_history_screen.dart';
 
-/// SB 화면별 라우트 정의.
-///
-/// ShellRoute/BottomNavigationBar가 필요하면 여기서 확장합니다.
-abstract final class AppRoutes {
-  static const home = '/';
-  static const map = '/map';
-  static const receiptShare = '/history/receipt';
-  static const stampHistory = '/history/stamps';
-}
-
 final appRouter = GoRouter(
-  initialLocation: AppRoutes.home,
+  initialLocation: '/splash',
   routes: [
     GoRoute(
-      path: AppRoutes.home,
-      builder: (context, state) => const HomeScreen(),
+      path: '/splash',
+      builder: (context, state) => const SplashScreen(),
     ),
     GoRoute(
-      path: AppRoutes.map,
-      builder: (context, state) => const MapScreen(),
+      path: '/onboarding',
+      builder: (context, state) => const OnboardingScreen(),
     ),
     GoRoute(
-      path: AppRoutes.receiptShare,
+      path: '/login',
+      builder: (context, state) => const LoginScreen(),
+    ),
+    ShellRoute(
+      builder: (context, state, child) => MainShell(child: child),
+      routes: [
+        GoRoute(
+          path: '/home',
+          builder: (context, state) => const HomeScreen(),
+        ),
+        GoRoute(
+          path: '/map',
+          builder: (context, state) => const MapScreen(),
+        ),
+        GoRoute(
+          path: '/saved',
+          builder: (context, state) => const SavedScreen(),
+        ),
+        GoRoute(
+          path: '/history',
+          builder: (context, state) => const MyHistoryScreen(),
+        ),
+      ],
+    ),
+    GoRoute(
+      path: '/history/receipt',
       builder: (context, state) => const ReceiptShareScreen(),
     ),
     GoRoute(
-      path: AppRoutes.stampHistory,
+      path: '/history/stamps',
       builder: (context, state) => const StampHistoryScreen(),
     ),
   ],
