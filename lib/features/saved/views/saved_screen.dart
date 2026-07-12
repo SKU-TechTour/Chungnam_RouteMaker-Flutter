@@ -13,7 +13,7 @@ class SavedScreen extends StatelessWidget {
         title: const Text('찜'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 20),
-          onPressed: () => context.go('/'),
+          onPressed: () => context.go('/home'),
         ),
         actions: [
           TextButton(

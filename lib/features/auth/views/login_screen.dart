@@ -57,21 +57,21 @@ class LoginScreen extends ConsumerWidget {
                 _KakaoButton(
                   onTap: () async {
                     final ok = await vm.loginWithKakao();
-                    if (ok && context.mounted) context.go('/');
+                    if (ok && context.mounted) context.go('/home');
                   },
                 ),
                 const SizedBox(height: 10),
                 _GoogleButton(
                   onTap: () async {
                     final ok = await vm.loginWithGoogle();
-                    if (ok && context.mounted) context.go('/');
+                    if (ok && context.mounted) context.go('/home');
                   },
                 ),
                 const SizedBox(height: 10),
                 _AppleButton(
                   onTap: () async {
                     final ok = await vm.loginWithGoogle();
-                    if (ok && context.mounted) context.go('/');
+                    if (ok && context.mounted) context.go('/home');
                   },
                 ),
               ],
@@ -101,8 +101,12 @@ class _KakaoButton extends StatelessWidget {
       decoration: BoxDecoration(color: const Color(0xFFFEE500), borderRadius: BorderRadius.circular(12)),
       clipBehavior: Clip.hardEdge,
       child: Center(
-        child: Image.asset('assets/images/auth/kakao_btn.png', height: 46, fit: BoxFit.fitHeight,
-          errorBuilder: (_, __, ___) => const Text('카카오 로그인', style: TextStyle(color: Color(0xFF3C1E1E), fontWeight: FontWeight.w700))),
+        child: Image.asset(
+          'assets/images/auth/kakao_btn.png',
+          height: 46,
+          fit: BoxFit.fitHeight,
+          errorBuilder: (_, __, ___) => const Text('카카오 로그인', style: TextStyle(color: Color(0xFF3C1E1E), fontWeight: FontWeight.w700)),
+        ),
       ),
     ),
   );

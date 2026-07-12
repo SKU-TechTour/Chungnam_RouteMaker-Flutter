@@ -91,7 +91,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             child: Row(
               children: [
                 GestureDetector(
-                  onTap: () => context.go('/'),
+                  onTap: () => context.go('/home'),
                   child: Container(
                     width: 40,
                     height: 40,
@@ -217,7 +217,7 @@ class _FilterSheet extends ConsumerWidget {
             decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 14),
           const Align(alignment: Alignment.centerLeft,
-            child: Text('동반자 맞춤 필터',
+            child: Text('상황별 맞춤 필터',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
           const SizedBox(height: 12),
           Row(children: [

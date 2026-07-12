@@ -32,7 +32,7 @@ class _MyHistoryScreenState extends ConsumerState<MyHistoryScreen> {
         title: const Text('여행 기록'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 20),
-          onPressed: () => context.go('/'),
+          onPressed: () => context.go('/home'),
         ),
       ),
       body: state.isLoading
