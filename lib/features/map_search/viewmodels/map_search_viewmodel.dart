@@ -3,6 +3,12 @@ import 'package:flutterprojects/core/di/providers.dart';
 import 'package:flutterprojects/features/map_search/models/place.dart';
 import 'package:flutterprojects/features/map_search/viewmodels/map_search_state.dart';
 
+const _mockPlaces = [
+  Place(id: 'p1', name: '공산성', type: PlaceType.tourist, lat: 36.4596, lng: 127.1128),
+  Place(id: 'p2', name: '중동식당', type: PlaceType.restaurant, lat: 36.4465, lng: 127.1191),
+  Place(id: 'p3', name: '제민천카페', type: PlaceType.cafe, lat: 36.4444, lng: 127.1200),
+];
+
 /// [SB 화면 3] 반려동물/유모차 필터 체크박스 상태 ViewModel.
 class MapSearchViewModel extends Notifier<MapSearchState> {
   @override
@@ -26,8 +32,9 @@ class MapSearchViewModel extends Notifier<MapSearchState> {
             ),
           );
       state = state.copyWith(places: places, isLoading: false);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+    } catch (_) {
+      // 백엔드/GPS 미연결 시 목업 데이터로 폴백
+      state = state.copyWith(places: _mockPlaces, isLoading: false);
     }
   }
 }

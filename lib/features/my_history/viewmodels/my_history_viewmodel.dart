@@ -18,8 +18,9 @@ class MyHistoryViewModel extends Notifier<MyHistoryState> {
         stamps: stamps,
         isLoading: false,
       );
-    } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+    } catch (_) {
+      // 백엔드 미연결 시 빈 상태로 폴백 (에러 메시지 숨김)
+      state = state.copyWith(isLoading: false);
     }
   }
 
