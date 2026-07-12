@@ -6,6 +6,8 @@ class MapSearchState {
     this.places = const [],
     this.petFriendly = false,
     this.strollerAccessible = false,
+    this.parking = false,
+    this.region = 'GONGJU',
     this.isLoading = false,
     this.errorMessage,
   });
@@ -13,6 +15,8 @@ class MapSearchState {
   final List<Place> places;
   final bool petFriendly;
   final bool strollerAccessible;
+  final bool parking;
+  final String region;
   final bool isLoading;
   final String? errorMessage;
 
@@ -20,6 +24,8 @@ class MapSearchState {
     List<Place>? places,
     bool? petFriendly,
     bool? strollerAccessible,
+    bool? parking,
+    String? region,
     bool? isLoading,
     String? errorMessage,
     bool clearError = false,
@@ -28,6 +34,8 @@ class MapSearchState {
       places: places ?? this.places,
       petFriendly: petFriendly ?? this.petFriendly,
       strollerAccessible: strollerAccessible ?? this.strollerAccessible,
+      parking: parking ?? this.parking,
+      region: region ?? this.region,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );

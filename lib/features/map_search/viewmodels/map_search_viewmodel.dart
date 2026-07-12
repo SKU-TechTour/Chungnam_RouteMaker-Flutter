@@ -8,13 +8,10 @@ class MapSearchViewModel extends Notifier<MapSearchState> {
   @override
   MapSearchState build() => const MapSearchState();
 
-  void togglePetFriendly(bool value) {
-    state = state.copyWith(petFriendly: value);
-  }
-
-  void toggleStrollerAccessible(bool value) {
-    state = state.copyWith(strollerAccessible: value);
-  }
+  void setRegion(String region) => state = state.copyWith(region: region);
+  void togglePetFriendly(bool value) => state = state.copyWith(petFriendly: value);
+  void toggleStrollerAccessible(bool value) => state = state.copyWith(strollerAccessible: value);
+  void toggleParking(bool value) => state = state.copyWith(parking: value);
 
   Future<void> searchNearby() async {
     state = state.copyWith(isLoading: true, clearError: true);

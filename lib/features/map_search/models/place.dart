@@ -44,6 +44,11 @@ class PlaceFilterRequest {
     this.strollerAccessible = false,
   });
 
+  final double lat;
+  final double lng;
+  final bool petFriendly;
+  final bool strollerAccessible;
+
   Map<String, dynamic> toJson() => {
         'lat': lat,
         'lng': lng,

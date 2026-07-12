@@ -10,7 +10,7 @@ class MilitaryGuideViewModel extends Notifier<MilitaryGuideState> {
 
   @override
   MilitaryGuideState build() {
-    ref.onDispose(_timer?.cancel);
+    ref.onDispose(() => _timer?.cancel());
     return const MilitaryGuideState();
   }
 
