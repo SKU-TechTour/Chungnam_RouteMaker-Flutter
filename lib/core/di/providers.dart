@@ -1,16 +1,21 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutterprojects/features/auth/viewmodels/auth_viewmodel.dart';
 import 'package:flutterprojects/core/network/dio_client.dart';
 import 'package:flutterprojects/core/utils/location_util.dart';
 import 'package:flutterprojects/features/home_curation/repositories/course_repository.dart';
 import 'package:flutterprojects/features/home_curation/viewmodels/home_curation_viewmodel.dart';
+import 'package:flutterprojects/features/home_curation/viewmodels/home_curation_state.dart';
 import 'package:flutterprojects/features/map_search/repositories/place_repository.dart';
 import 'package:flutterprojects/features/map_search/viewmodels/map_search_viewmodel.dart';
+import 'package:flutterprojects/features/map_search/viewmodels/map_search_state.dart';
 import 'package:flutterprojects/features/military_guide/data/platform/live_widget_channel.dart';
 import 'package:flutterprojects/features/military_guide/repositories/military_repository.dart';
 import 'package:flutterprojects/features/military_guide/viewmodels/military_guide_viewmodel.dart';
+import 'package:flutterprojects/features/military_guide/viewmodels/military_guide_state.dart';
 import 'package:flutterprojects/features/my_history/repositories/reward_remote_repository.dart';
 import 'package:flutterprojects/features/my_history/repositories/stamp_local_repository.dart';
 import 'package:flutterprojects/features/my_history/viewmodels/my_history_viewmodel.dart';
+import 'package:flutterprojects/features/my_history/viewmodels/my_history_state.dart';
 
 /// 앱 전역 의존성 주입 (Riverpod Provider).
 ///
@@ -49,6 +54,8 @@ final stampLocalRepositoryProvider = Provider(
 );
 
 // --- ViewModels ---
+
+final authViewModelProvider = ChangeNotifierProvider((ref) => AuthViewModel());
 
 final homeCurationViewModelProvider =
     NotifierProvider<HomeCurationViewModel, HomeCurationState>(
