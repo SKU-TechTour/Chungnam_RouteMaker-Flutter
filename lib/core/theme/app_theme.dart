@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 abstract final class AppTheme {
-  static const primary = Color(0xFF1A6B3C);
-  static const accent = Color(0xFF2E9E5B);
+  static const primary = Color(0xFF009688);
+  static const accent = Color(0xFF26A69A);
   static const warning = Color(0xFFF59E0B);
-  static const success = Color(0xFF10B981);
-  static const background = Color(0xFFF8FAF9);
+  static const success = Color(0xFF00BFA5);
+  static const background = Color(0xFFF0F4F4);
   static const surface = Colors.white;
   static const divider = Color(0xFFE5E7EB);
   static const textPrimary = Color(0xFF111827);
@@ -13,7 +13,7 @@ abstract final class AppTheme {
 
   static ThemeData get light {
     return ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: primary),
+      colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
       useMaterial3: true,
       scaffoldBackgroundColor: background,
       appBarTheme: const AppBarTheme(
