@@ -22,23 +22,23 @@ class MainShell extends StatelessWidget {
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
             label: '홈',
           ),
           NavigationDestination(
             icon: Icon(Icons.map_outlined),
             selectedIcon: Icon(Icons.map),
-            label: '주변콤보',
+            label: '주변 콤보',
           ),
           NavigationDestination(
-            icon: Icon(Icons.favorite_outline),
+            icon: Icon(Icons.favorite_border),
             selectedIcon: Icon(Icons.favorite),
             label: '찜',
           ),
           NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
             label: '기록',
           ),
         ],
