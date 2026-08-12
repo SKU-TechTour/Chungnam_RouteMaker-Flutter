@@ -25,7 +25,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     Future.microtask(
-      () => ref.read(homeCurationViewModelProvider.notifier).loadCourses(),
+      () => ref
+          .read(homeCurationViewModelProvider.notifier)
+          .loadCourses(region: 'NONSAN'),
     );
     _startTimer();
   }
@@ -42,6 +44,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   void _onTabTap(int i) {
     setState(() => _regionIndex = i);
+    ref
+        .read(homeCurationViewModelProvider.notifier)
+        .loadCourses(region: const ['NONSAN', 'GONGJU', 'BUYEO'][i]);
     _startTimer();
   }
 
@@ -68,9 +73,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               child: const Text(
                 '루트메이커',
                 style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textPrimary),
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimary,
+                ),
               ),
             ),
             TabBar(
@@ -81,9 +87,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               labelColor: AppTheme.textPrimary,
               unselectedLabelColor: AppTheme.textSecondary,
               labelStyle: const TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w700),
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
               unselectedLabelStyle: const TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w400),
+                fontSize: 15,
+                fontWeight: FontWeight.w400,
+              ),
               indicatorColor: AppTheme.textPrimary,
               indicatorWeight: 2,
               indicatorSize: TabBarIndicatorSize.label,
@@ -95,11 +105,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               child: state.isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : course == null
-                      ? const Center(child: Text('추천 코스가 없습니다'))
-                      : _CourseContent(
-                          course: course,
-                          region: _regions[_regionIndex],
-                        ),
+                  ? const Center(child: Text('추천 코스가 없습니다'))
+                  : _CourseContent(
+                      course: course,
+                      region: _regions[_regionIndex],
+                    ),
             ),
           ],
         ),
@@ -131,14 +141,17 @@ class _CourseContent extends StatelessWidget {
               const Text(
                 '맞춤형 3단 콤보',
                 style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
               ),
               const Spacer(),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.primary,
                   borderRadius: BorderRadius.circular(20),
@@ -148,11 +161,14 @@ class _CourseContent extends StatelessWidget {
                   children: [
                     Icon(Icons.auto_awesome, color: Colors.white, size: 12),
                     SizedBox(width: 4),
-                    Text('90% Match',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600)),
+                    Text(
+                      '90% Match',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -172,8 +188,11 @@ class _CourseContent extends StatelessWidget {
                       height: 200,
                       width: double.infinity,
                       color: const Color(0xFFB8C8B8),
-                      child: const Icon(Icons.landscape,
-                          size: 64, color: Colors.white54),
+                      child: const Icon(
+                        Icons.landscape,
+                        size: 64,
+                        color: Colors.white54,
+                      ),
                     ),
                     if (course.weatherTag != null)
                       Positioned(
@@ -181,7 +200,9 @@ class _CourseContent extends StatelessWidget {
                         left: 12,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.92),
                             borderRadius: BorderRadius.circular(20),
@@ -189,7 +210,9 @@ class _CourseContent extends StatelessWidget {
                           child: Text(
                             course.weatherTag!,
                             style: const TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.w600),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
@@ -204,9 +227,10 @@ class _CourseContent extends StatelessWidget {
                           fontSize: 13,
                           shadows: [
                             Shadow(
-                                color: Colors.black54,
-                                blurRadius: 6,
-                                offset: Offset(0, 1))
+                              color: Colors.black54,
+                              blurRadius: 6,
+                              offset: Offset(0, 1),
+                            ),
                           ],
                         ),
                       ),
@@ -224,8 +248,11 @@ class _CourseContent extends StatelessWidget {
                             height: 120,
                             color: const Color(0xFFC8B8A8),
                             child: const Center(
-                              child: Icon(Icons.restaurant,
-                                  size: 40, color: Colors.white54),
+                              child: Icon(
+                                Icons.restaurant,
+                                size: 40,
+                                color: Colors.white54,
+                              ),
                             ),
                           ),
                           const Positioned(
@@ -238,8 +265,7 @@ class _CourseContent extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                                 fontSize: 12,
                                 shadows: [
-                                  Shadow(
-                                      color: Colors.black54, blurRadius: 4)
+                                  Shadow(color: Colors.black54, blurRadius: 4),
                                 ],
                               ),
                             ),
@@ -255,8 +281,11 @@ class _CourseContent extends StatelessWidget {
                             height: 120,
                             color: const Color(0xFFA8B8C8),
                             child: const Center(
-                              child: Icon(Icons.shopping_bag,
-                                  size: 40, color: Colors.white54),
+                              child: Icon(
+                                Icons.shopping_bag,
+                                size: 40,
+                                color: Colors.white54,
+                              ),
                             ),
                           ),
                           const Positioned(
@@ -269,8 +298,7 @@ class _CourseContent extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                                 fontSize: 12,
                                 shadows: [
-                                  Shadow(
-                                      color: Colors.black54, blurRadius: 4)
+                                  Shadow(color: Colors.black54, blurRadius: 4),
                                 ],
                               ),
                             ),
@@ -289,17 +317,19 @@ class _CourseContent extends StatelessWidget {
           Text(
             course.title,
             style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.textPrimary),
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimary,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             '$spot1 · $spot2 · $spot3 코스를 탐험해보세요',
             style: const TextStyle(
-                fontSize: 13,
-                color: AppTheme.textSecondary,
-                height: 1.5),
+              fontSize: 13,
+              color: AppTheme.textSecondary,
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 20),
 
@@ -314,12 +344,12 @@ class _CourseContent extends StatelessWidget {
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
               child: const Text(
                 '이 코스 시작하기',
-                style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
             ),
           ),

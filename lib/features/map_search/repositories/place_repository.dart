@@ -11,11 +11,11 @@ class PlaceRepository {
 
   Future<List<Place>> filterPlaces(PlaceFilterRequest request) async {
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        ApiConstants.placesFilter,
-        data: request.toJson(),
+      final response = await _dio.get<Map<String, dynamic>>(
+        ApiConstants.places,
+        queryParameters: request.toQueryParameters(),
       );
-      final list = response.data?['places'] as List<dynamic>? ?? [];
+      final list = response.data?['data'] as List<dynamic>? ?? [];
       return list
           .map((e) => Place.fromJson(e as Map<String, dynamic>))
           .toList();

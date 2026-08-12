@@ -8,18 +8,34 @@ class MilitaryRepository {
   MilitaryRepository({
     required Dio dio,
     required LiveWidgetChannel liveWidgetChannel,
-  })  : _dio = dio,
-        _liveWidgetChannel = liveWidgetChannel;
+  }) : _dio = dio,
+       _liveWidgetChannel = liveWidgetChannel;
 
   final Dio _dio;
   final LiveWidgetChannel _liveWidgetChannel;
 
   /// Spring `GET /api/military/safe-time` — 복귀 가능까지 남은 분
-  Future<int> fetchSafeTimeMinutes() async {
+  Future<int> fetchSafeTimeMinutes({
+    required int unitId,
+    required double lat,
+    required double lng,
+    required int returnDeadlineMinutes,
+  }) async {
     try {
-      final response =
-          await _dio.get<Map<String, dynamic>>(ApiConstants.militarySafeTime);
-      return response.data?['minutesLeft'] as int? ?? 0;
+      final response = await _dio.get<Map<String, dynamic>>(
+        ApiConstants.militarySafeTime,
+        queryParameters: {
+          'unitId': unitId,
+          'lat': lat,
+          'lng': lng,
+          'returnDeadlineMinutes': returnDeadlineMinutes,
+        },
+      );
+      final data = response.data?['data'];
+      if (data is! Map<String, dynamic> || data['remainingMinutes'] is! int) {
+        throw const ApiException(message: 'Invalid safe-time response');
+      }
+      return data['remainingMinutes'] as int;
     } on DioException catch (e) {
       final error = e.error;
       if (error is ApiException) throw error;

@@ -1,21 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../core/theme/app_theme.dart';
-
-class _OnboardingPage {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-
-  const _OnboardingPage({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-  });
-}
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -25,149 +12,219 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  final _pageController = PageController();
-  int _currentPage = 0;
+  final _controller = PageController();
+  var _page = 0;
 
-  final _pages = const [
-    _OnboardingPage(
-      title: '맞춤형 3단 콤보 코스',
-      subtitle: '볼거리 · 먹거리 · 쉴거리\n최적의 여행 코스를 카드로 만나보세요',
-      icon: Icons.route,
-      color: Color(0xFF3B82F6),
+  static const _items = [
+    _OnboardingItem(
+      eyebrow: 'CURATED FOR YOU',
+      title: '하루가 가벼워지는\n세 곳의 조합',
+      description: '보고, 먹고, 쉬는 곳까지.\n당신의 취향으로 여행을 엮어드려요.',
+      icon: Icons.auto_awesome_rounded,
+      color: AppTheme.coral,
+      background: AppTheme.softCoral,
     ),
-    _OnboardingPage(
-      title: '날씨 연동 Plan B',
-      subtitle: '비 오는 날엔 자동으로\n실내 코스로 바꿔드려요',
-      icon: Icons.wb_cloudy,
-      color: Color(0xFF8B5CF6),
+    _OnboardingItem(
+      eyebrow: 'SMART PLAN B',
+      title: '날씨가 바뀌어도\n여행은 멈추지 않게',
+      description: '비 오는 날에도 좋은 실내 코스를\n한 번의 탭으로 제안해요.',
+      icon: Icons.cloudy_snowing,
+      color: Color(0xFF5B7CFA),
+      background: Color(0xFFE8ECFF),
     ),
-    _OnboardingPage(
-      title: '논산 Safe-Time',
-      subtitle: '부대 복귀 시간을\n실시간으로 알려드려요',
-      icon: Icons.timer,
-      color: Color(0xFF10B981),
+    _OnboardingItem(
+      eyebrow: 'TRAVEL PASSPORT',
+      title: '걸어온 여행을\n나만의 기록으로',
+      description: '완주 스탬프와 영수증 카드로\n오늘의 여정을 간직하세요.',
+      icon: Icons.verified_user_rounded,
+      color: AppTheme.accent,
+      background: AppTheme.softMint,
     ),
   ];
 
   Future<void> _finish() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('onboarded', true);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('onboarded', true);
     if (mounted) context.go('/login');
   }
 
   @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final item = _items[_page];
     return Scaffold(
-      backgroundColor: AppTheme.background,
       body: SafeArea(
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: TextButton(
-                onPressed: _finish,
-                child: const Text('건너뛰기',
-                    style: TextStyle(color: AppTheme.textSecondary)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _finish,
+                  child: const Text('건너뛰기'),
+                ),
               ),
-            ),
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: _pages.length,
-                onPageChanged: (i) => setState(() => _currentPage = i),
-                itemBuilder: (_, i) => _OnboardingPageWidget(page: _pages[i]),
+              Expanded(
+                child: PageView.builder(
+                  controller: _controller,
+                  onPageChanged: (value) => setState(() => _page = value),
+                  itemCount: _items.length,
+                  itemBuilder: (_, index) =>
+                      _OnboardingPage(item: _items[index]),
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(28, 0, 28, 40),
-              child: Column(
+              Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      _pages.length,
-                      (i) => AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: _currentPage == i ? 24 : 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: _currentPage == i
-                              ? AppTheme.accent
-                              : AppTheme.divider,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
+                  ...List.generate(
+                    _items.length,
+                    (index) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      width: index == _page ? 28 : 8,
+                      height: 8,
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: index == _page ? item.color : AppTheme.divider,
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 28),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (_currentPage < _pages.length - 1) {
-                        _pageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      } else {
-                        _finish();
-                      }
-                    },
-                    child: Text(
-                      _currentPage < _pages.length - 1 ? '다음' : '시작하기',
+                  const Spacer(),
+                  Text(
+                    '${_page + 1} / ${_items.length}',
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: 22),
+              FilledButton(
+                onPressed: _page == _items.length - 1
+                    ? _finish
+                    : () => _controller.nextPage(
+                        duration: const Duration(milliseconds: 360),
+                        curve: Curves.easeOutCubic,
+                      ),
+                style: FilledButton.styleFrom(backgroundColor: item.color),
+                child: Text(_page == _items.length - 1 ? '여행 시작하기' : '다음 이야기'),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _OnboardingPageWidget extends StatelessWidget {
-  final _OnboardingPage page;
-  const _OnboardingPageWidget({required this.page});
+class _OnboardingItem {
+  const _OnboardingItem({
+    required this.eyebrow,
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.color,
+    required this.background,
+  });
+
+  final String eyebrow;
+  final String title;
+  final String description;
+  final IconData icon;
+  final Color color;
+  final Color background;
+}
+
+class _OnboardingPage extends StatelessWidget {
+  const _OnboardingPage({required this.item});
+
+  final _OnboardingItem item;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: page.color.withOpacity(0.1),
-              shape: BoxShape.circle,
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      Container(
+        height: 310,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: item.background,
+          borderRadius: BorderRadius.circular(36),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 190,
+              height: 190,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.62),
+                shape: BoxShape.circle,
+              ),
             ),
-            child: Icon(page.icon, color: page.color, size: 56),
-          ),
-          const SizedBox(height: 40),
-          Text(
-            page.title,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
+            Icon(item.icon, color: item.color, size: 86),
+            Positioned(top: 34, left: 32, child: _Dot(color: item.color)),
+            Positioned(
+              bottom: 42,
+              right: 40,
+              child: _Dot(color: item.color, small: true),
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 14),
-          Text(
-            page.subtitle,
-            style: const TextStyle(
-              fontSize: 16,
-              color: AppTheme.textSecondary,
-              height: 1.6,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+          ],
+        ),
       ),
-    );
-  }
+      const SizedBox(height: 46),
+      Text(
+        item.eyebrow,
+        style: TextStyle(
+          color: item.color,
+          letterSpacing: 1.4,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      const SizedBox(height: 12),
+      Text(
+        item.title,
+        style: const TextStyle(
+          fontSize: 30,
+          height: 1.22,
+          letterSpacing: -1.1,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      const SizedBox(height: 16),
+      Text(
+        item.description,
+        style: const TextStyle(
+          fontSize: 16,
+          height: 1.55,
+          color: AppTheme.textSecondary,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    ],
+  );
+}
+
+class _Dot extends StatelessWidget {
+  const _Dot({required this.color, this.small = false});
+  final Color color;
+  final bool small;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: small ? 12 : 18,
+    height: small ? 12 : 18,
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.75),
+      shape: BoxShape.circle,
+    ),
+  );
 }

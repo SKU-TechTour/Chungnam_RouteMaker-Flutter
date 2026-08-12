@@ -46,12 +46,10 @@ final placeRepositoryProvider = Provider(
 );
 
 final rewardRemoteRepositoryProvider = Provider(
-  (ref) => RewardRemoteRepository(ref.watch(dioProvider)),
+  (ref) => const RewardRemoteRepository(),
 );
 
-final stampLocalRepositoryProvider = Provider(
-  (ref) => StampLocalRepository(),
-);
+final stampLocalRepositoryProvider = Provider((ref) => StampLocalRepository());
 
 // --- ViewModels ---
 
@@ -59,20 +57,20 @@ final authViewModelProvider = ChangeNotifierProvider((ref) => AuthViewModel());
 
 final homeCurationViewModelProvider =
     NotifierProvider<HomeCurationViewModel, HomeCurationState>(
-  HomeCurationViewModel.new,
-);
+      HomeCurationViewModel.new,
+    );
 
 final militaryGuideViewModelProvider =
     NotifierProvider<MilitaryGuideViewModel, MilitaryGuideState>(
-  MilitaryGuideViewModel.new,
-);
+      MilitaryGuideViewModel.new,
+    );
 
 final mapSearchViewModelProvider =
     NotifierProvider<MapSearchViewModel, MapSearchState>(
-  MapSearchViewModel.new,
-);
+      MapSearchViewModel.new,
+    );
 
 final myHistoryViewModelProvider =
     NotifierProvider<MyHistoryViewModel, MyHistoryState>(
-  MyHistoryViewModel.new,
-);
+      MyHistoryViewModel.new,
+    );

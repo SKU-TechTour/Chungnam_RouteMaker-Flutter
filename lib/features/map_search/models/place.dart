@@ -15,12 +15,17 @@ class Place {
   });
 
   factory Place.fromJson(Map<String, dynamic> json) {
+    final category = json['category'] as String?;
     return Place(
-      id: json['id'] as String,
+      id: json['id'].toString(),
       name: json['name'] as String,
-      type: PlaceType.values.byName(json['type'] as String),
-      lat: (json['lat'] as num).toDouble(),
-      lng: (json['lng'] as num).toDouble(),
+      type: switch (category) {
+        'RESTAURANT' => PlaceType.restaurant,
+        'CAFE' => PlaceType.cafe,
+        _ => PlaceType.tourist,
+      },
+      lat: (json['latitude'] as num).toDouble(),
+      lng: (json['longitude'] as num).toDouble(),
       petFriendly: json['petFriendly'] as bool? ?? false,
       strollerAccessible: json['strollerAccessible'] as bool? ?? false,
     );
@@ -38,21 +43,21 @@ class Place {
 /// 필터 API 요청 body
 class PlaceFilterRequest {
   const PlaceFilterRequest({
-    required this.lat,
-    required this.lng,
+    required this.region,
     this.petFriendly = false,
     this.strollerAccessible = false,
+    this.largeParking = false,
   });
 
-  final double lat;
-  final double lng;
+  final String region;
   final bool petFriendly;
   final bool strollerAccessible;
+  final bool largeParking;
 
-  Map<String, dynamic> toJson() => {
-        'lat': lat,
-        'lng': lng,
-        'petFriendly': petFriendly,
-        'strollerAccessible': strollerAccessible,
-      };
+  Map<String, dynamic> toQueryParameters() => {
+    'region': region,
+    'petFriendly': petFriendly,
+    'strollerAccessible': strollerAccessible,
+    'largeParking': largeParking,
+  };
 }

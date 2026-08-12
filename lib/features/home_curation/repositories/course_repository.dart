@@ -11,17 +11,41 @@ class CourseRepository {
 
   final Dio _dio;
 
-  Future<List<Course>> fetchCourses() async {
+  Future<List<Course>> fetchCourses({
+    required String region,
+    bool military = false,
+  }) async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(ApiConstants.courses);
-      final list = response.data?['courses'] as List<dynamic>? ?? [];
-      return list
-          .map((e) => Course.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final response = await _dio.post<Map<String, dynamic>>(
+        ApiConstants.courseRecommend,
+        data: {'region': region, 'military': military},
+      );
+      final data = response.data?['data'];
+      if (data is! Map<String, dynamic>) {
+        throw const ApiException(message: 'Invalid course response');
+      }
+      return [Course.fromJson(data)];
     } on DioException catch (e) {
       final error = e.error;
       if (error is ApiException) throw error;
       throw ApiException(message: e.message ?? 'Failed to fetch courses');
+    }
+  }
+
+  Future<Course> shufflePlanB(String courseId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/api/courses/$courseId/shuffle',
+      );
+      final data = response.data?['data'];
+      if (data is! Map<String, dynamic>) {
+        throw const ApiException(message: 'Invalid course response');
+      }
+      return Course.fromJson(data);
+    } on DioException catch (e) {
+      final error = e.error;
+      if (error is ApiException) throw error;
+      throw ApiException(message: e.message ?? 'Failed to shuffle course');
     }
   }
 }

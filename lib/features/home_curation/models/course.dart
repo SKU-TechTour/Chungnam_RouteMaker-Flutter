@@ -10,13 +10,14 @@ class Course {
   });
 
   factory Course.fromJson(Map<String, dynamic> json) {
+    final combo = json['combo'] as List<dynamic>? ?? const [];
     return Course(
-      id: json['id'] as String,
+      id: json['id'].toString(),
       title: json['title'] as String,
-      spots: (json['spots'] as List<dynamic>)
-          .map((e) => e as String)
+      spots: combo
+          .map((e) => (e as Map<String, dynamic>)['name'] as String)
           .toList(),
-      weatherTag: json['weatherTag'] as String?,
+      weatherTag: json['indoor'] == true ? 'Indoor' : 'Outdoor',
     );
   }
 

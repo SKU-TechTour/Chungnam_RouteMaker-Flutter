@@ -51,6 +51,23 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> continueAsGuest() async {
+    _state = AuthState.loading;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      _user = await _repository.continueAsGuest();
+      _state = AuthState.success;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _state = AuthState.error;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _repository.logout();
     _user = null;

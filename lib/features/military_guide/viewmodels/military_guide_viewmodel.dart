@@ -14,17 +14,26 @@ class MilitaryGuideViewModel extends Notifier<MilitaryGuideState> {
     return const MilitaryGuideState();
   }
 
-  Future<void> startCountdown() async {
+  Future<void> startCountdown({
+    int unitId = 1,
+    double lat = 36.4465,
+    double lng = 127.1191,
+    int returnDeadlineMinutes = 180,
+  }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final minutes =
-          await ref.read(militaryRepositoryProvider).fetchSafeTimeMinutes();
+      final minutes = await ref
+          .read(militaryRepositoryProvider)
+          .fetchSafeTimeMinutes(
+            unitId: unitId,
+            lat: lat,
+            lng: lng,
+            returnDeadlineMinutes: returnDeadlineMinutes,
+          );
       var secondsLeft = minutes * 60;
       state = state.copyWith(secondsLeft: secondsLeft, isLoading: false);
 
-      await ref
-          .read(militaryRepositoryProvider)
-          .syncLiveWidget(secondsLeft);
+      await ref.read(militaryRepositoryProvider).syncLiveWidget(secondsLeft);
 
       _timer?.cancel();
       _timer = Timer.periodic(const Duration(seconds: 1), (_) {
