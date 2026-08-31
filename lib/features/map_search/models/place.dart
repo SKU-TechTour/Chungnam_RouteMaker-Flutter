@@ -12,6 +12,7 @@ class Place {
     required this.lng,
     this.petFriendly = false,
     this.strollerAccessible = false,
+    this.largeParking = false,
     this.distanceMeters,
   });
 
@@ -30,6 +31,7 @@ class Place {
       lng: (json['longitude'] as num).toDouble(),
       petFriendly: json['petFriendly'] as bool? ?? false,
       strollerAccessible: json['strollerAccessible'] as bool? ?? false,
+      largeParking: json['largeParking'] as bool? ?? false,
     );
   }
 
@@ -40,6 +42,7 @@ class Place {
   final double lng;
   final bool petFriendly;
   final bool strollerAccessible;
+  final bool largeParking;
   final double? distanceMeters;
 
   Place withDistance(double value) => Place(
@@ -50,6 +53,7 @@ class Place {
     lng: lng,
     petFriendly: petFriendly,
     strollerAccessible: strollerAccessible,
+    largeParking: largeParking,
     distanceMeters: value,
   );
 

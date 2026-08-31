@@ -1,0 +1,14 @@
+[
+  {"id":"1","name":"육군훈련소","region":"NONSAN","category":"HERITAGE","latitude":36.1119731,"longitude":127.1083526,"petFriendly":false,"strollerAccessible":true,"largeParking":true},
+  {"id":"2","name":"관촉사","region":"NONSAN","category":"HERITAGE","latitude":36.1884477,"longitude":127.1130246,"petFriendly":false,"strollerAccessible":false,"largeParking":true},
+  {"id":"3","name":"탑정호","region":"NONSAN","category":"HERITAGE","latitude":36.1783768,"longitude":127.1798397,"petFriendly":true,"strollerAccessible":true,"largeParking":true},
+  {"id":"4","name":"강경구락부","region":"NONSAN","category":"CAFE","latitude":36.1621613,"longitude":127.0156316,"petFriendly":false,"strollerAccessible":false,"largeParking":false},
+  {"id":"5","name":"공산성","region":"GONGJU","category":"HERITAGE","latitude":36.4631426,"longitude":127.1264411,"petFriendly":false,"strollerAccessible":false,"largeParking":true},
+  {"id":"6","name":"국립공주박물관","region":"GONGJU","category":"HERITAGE","latitude":36.4655287,"longitude":127.1122874,"petFriendly":false,"strollerAccessible":true,"largeParking":true},
+  {"id":"7","name":"공주한옥마을","region":"GONGJU","category":"ACCOMMODATION","latitude":36.4647117,"longitude":127.1087143,"petFriendly":false,"strollerAccessible":true,"largeParking":true},
+  {"id":"8","name":"석장리박물관","region":"GONGJU","category":"HERITAGE","latitude":36.4476254,"longitude":127.1895492,"petFriendly":false,"strollerAccessible":true,"largeParking":true},
+  {"id":"9","name":"백제문화단지","region":"BUYEO","category":"HERITAGE","latitude":36.3073820,"longitude":126.9072410,"petFriendly":false,"strollerAccessible":true,"largeParking":true},
+  {"id":"10","name":"부소산성","region":"BUYEO","category":"HERITAGE","latitude":36.2892424,"longitude":126.9151865,"petFriendly":false,"strollerAccessible":false,"largeParking":true},
+  {"id":"11","name":"국립부여박물관","region":"BUYEO","category":"HERITAGE","latitude":36.2763114,"longitude":126.9190510,"petFriendly":false,"strollerAccessible":true,"largeParking":true},
+  {"id":"12","name":"정림사지박물관","region":"BUYEO","category":"HERITAGE","latitude":36.2792287,"longitude":126.9151939,"petFriendly":false,"strollerAccessible":true,"largeParking":true}
+]

@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import 'package:flutterprojects/core/constants/api_constants.dart';
 import 'package:flutterprojects/core/network/api_exception.dart';
 import 'package:flutterprojects/features/map_search/models/place.dart';
@@ -8,6 +11,21 @@ class PlaceRepository {
   PlaceRepository(this._dio);
 
   final Dio _dio;
+
+  Future<List<Place>> loadMockPlaces(PlaceFilterRequest request) async {
+    final raw = await rootBundle.loadString('assets/mock/places.json');
+    final list = (jsonDecode(raw) as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .where((item) => item['region'] == request.region)
+        .map(Place.fromJson)
+        .where((place) => !request.petFriendly || place.petFriendly)
+        .where(
+          (place) => !request.strollerAccessible || place.strollerAccessible,
+        )
+        .where((place) => !request.largeParking || place.largeParking)
+        .toList();
+    return list;
+  }
 
   Future<List<Place>> filterPlaces(PlaceFilterRequest request) async {
     try {

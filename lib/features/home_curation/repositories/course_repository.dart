@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import 'package:flutterprojects/core/constants/api_constants.dart';
 import 'package:flutterprojects/core/network/api_exception.dart';
 import 'package:flutterprojects/features/home_curation/models/course.dart';
@@ -10,6 +13,15 @@ class CourseRepository {
   CourseRepository(this._dio);
 
   final Dio _dio;
+
+  Future<List<Course>> loadMockCourses({required String region}) async {
+    final raw = await rootBundle.loadString('assets/mock/courses.json');
+    final list = jsonDecode(raw) as List<dynamic>;
+    return list
+        .where((item) => (item as Map<String, dynamic>)['region'] == region)
+        .map((item) => Course.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
 
   Future<List<Course>> fetchCourses({
     required String region,

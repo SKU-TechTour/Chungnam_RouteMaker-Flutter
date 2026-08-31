@@ -3,6 +3,12 @@
 /// [baseUrl]은 환경(dev/staging/prod)별로 분리할 예정이면
 /// `--dart-define` 또는 flavor 설정으로 교체하세요.
 abstract final class ApiConstants {
+  /// Day 2 퍼블리싱 기본값. 실서버 통합 테스트에서는 false로 덮어씁니다.
+  static const bool useMockData = bool.fromEnvironment(
+    'USE_MOCK_DATA',
+    defaultValue: true,
+  );
+
   /// Override this with `--dart-define=API_BASE_URL=http://...` for a device.
   /// Android emulators reach the development machine through 10.0.2.2.
   static const String baseUrl = String.fromEnvironment(

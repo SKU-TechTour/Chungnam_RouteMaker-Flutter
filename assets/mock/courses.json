@@ -1,0 +1,8 @@
+[
+  {"id":"n1","region":"NONSAN","title":"입영 전 마음 정리 콤보","indoor":false,"combo":[{"name":"육군훈련소"},{"name":"관촉사"},{"name":"탑정호"}]},
+  {"id":"n2","region":"NONSAN","title":"동행 가족 논산 로컬 콤보","indoor":false,"combo":[{"name":"육군훈련소"},{"name":"강경근대역사문화거리"},{"name":"강경구락부"}]},
+  {"id":"g1","region":"GONGJU","title":"백제 역사 산책 콤보","indoor":false,"combo":[{"name":"무령왕릉과 왕릉원"},{"name":"공산성"},{"name":"베이커리 인화당"}]},
+  {"id":"g2","region":"GONGJU","title":"비 오는 날 공주 콤보","indoor":true,"combo":[{"name":"국립공주박물관"},{"name":"동해원"},{"name":"하루카페&밤떡명가"}]},
+  {"id":"b1","region":"BUYEO","title":"부여 백제 시간여행 콤보","indoor":false,"combo":[{"name":"부소산성"},{"name":"정림사지박물관"},{"name":"궁남지"}]},
+  {"id":"b2","region":"BUYEO","title":"부여 맛과 쉼 콤보","indoor":true,"combo":[{"name":"국립부여박물관"},{"name":"장원막국수"},{"name":"백제향"}]}
+]

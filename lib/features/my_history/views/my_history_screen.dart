@@ -6,8 +6,21 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/theme/app_theme.dart';
 
-class MyHistoryScreen extends ConsumerWidget {
+class MyHistoryScreen extends ConsumerStatefulWidget {
   const MyHistoryScreen({super.key});
+
+  @override
+  ConsumerState<MyHistoryScreen> createState() => _MyHistoryScreenState();
+}
+
+class _MyHistoryScreenState extends ConsumerState<MyHistoryScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(
+      () => ref.read(myHistoryViewModelProvider.notifier).loadHistory(),
+    );
+  }
 
   Future<void> _shareReceipt(BuildContext context) async {
     final box = context.findRenderObject() as RenderBox?;
@@ -28,8 +41,13 @@ class MyHistoryScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final user = ref.watch(authViewModelProvider).user;
+    final history = ref.watch(myHistoryViewModelProvider);
+    final visitedPlaces = history.receipts.fold<int>(
+      0,
+      (sum, receipt) => sum + receipt.amount,
+    );
     return Scaffold(
       body: SafeArea(
         child: CustomScrollView(
@@ -85,11 +103,11 @@ class MyHistoryScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 26),
-                  const Row(
+                  Row(
                     children: [
                       Expanded(
                         child: _StatCard(
-                          value: '2',
+                          value: '${history.receipts.length}',
                           label: '완주 코스',
                           icon: Icons.route_rounded,
                         ),
@@ -97,7 +115,7 @@ class MyHistoryScreen extends ConsumerWidget {
                       SizedBox(width: 10),
                       Expanded(
                         child: _StatCard(
-                          value: '6',
+                          value: '$visitedPlaces',
                           label: '방문 장소',
                           icon: Icons.place_rounded,
                         ),
@@ -105,7 +123,7 @@ class MyHistoryScreen extends ConsumerWidget {
                       SizedBox(width: 10),
                       Expanded(
                         child: _StatCard(
-                          value: '2',
+                          value: '${history.stamps.length}',
                           label: '획득 뱃지',
                           icon: Icons.workspace_premium_rounded,
                         ),
@@ -153,11 +171,24 @@ class MyHistoryScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  const _ReceiptCard(),
+                  GestureDetector(
+                    onTap: () => context.push('/history/receipt'),
+                    child: const _ReceiptCard(),
+                  ),
                   const SizedBox(height: 30),
-                  const _SectionTitle(
-                    title: '완주 스탬프',
-                    subtitle: '도장을 모아 충남 여행 지도를 완성해보세요.',
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: _SectionTitle(
+                          title: '완주 스탬프',
+                          subtitle: '도장을 모아 충남 여행 지도를 완성해보세요.',
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => context.push('/history/stamps'),
+                        child: const Text('전체 보기'),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 14),
                   const Row(
@@ -483,42 +514,53 @@ class _BenefitCard extends StatelessWidget {
   final String description;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$title 혜택은 데모 종료 후 쿠폰함에서 사용할 수 있어요.')),
     ),
-    child: Row(
-      children: [
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(15),
+    child: Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Icon(icon, color: color),
           ),
-          child: Icon(icon, color: color),
-        ),
-        const SizedBox(width: 13),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
-              const SizedBox(height: 3),
-              Text(
-                description,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppTheme.textSecondary,
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
-              ),
-            ],
+                const SizedBox(height: 3),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const Icon(Icons.chevron_right_rounded, color: AppTheme.textSecondary),
-      ],
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: AppTheme.textSecondary,
+          ),
+        ],
+      ),
     ),
   );
 }
