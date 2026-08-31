@@ -2,11 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Feature 공통 에러 표시 위젯.
 class AppErrorWidget extends StatelessWidget {
-  const AppErrorWidget({
-    super.key,
-    required this.message,
-    this.onRetry,
-  });
+  const AppErrorWidget({super.key, required this.message, this.onRetry});
 
   final String message;
   final VoidCallback? onRetry;

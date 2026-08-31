@@ -3,11 +3,7 @@ import 'package:flutterprojects/features/home_curation/models/course.dart';
 
 /// 3단 콤보 코스 카드 위젯.
 class ComboCard extends StatelessWidget {
-  const ComboCard({
-    super.key,
-    required this.course,
-    required this.onSwipe,
-  });
+  const ComboCard({super.key, required this.course, required this.onSwipe});
 
   final Course course;
   final ValueChanged<int> onSwipe;
@@ -31,11 +27,11 @@ class ComboCard extends StatelessWidget {
             ],
             const SizedBox(height: 16),
             ...course.spots.asMap().entries.map(
-                  (entry) => ListTile(
-                    leading: CircleAvatar(child: Text('${entry.key + 1}')),
-                    title: Text(entry.value),
-                  ),
-                ),
+              (entry) => ListTile(
+                leading: CircleAvatar(child: Text('${entry.key + 1}')),
+                title: Text(entry.value),
+              ),
+            ),
           ],
         ),
       ),

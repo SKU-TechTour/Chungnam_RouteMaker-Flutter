@@ -1,208 +1,193 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../models/saved_course.dart';
+import '../viewmodels/saved_courses_provider.dart';
 
-class SavedScreen extends StatefulWidget {
+class SavedScreen extends ConsumerWidget {
   const SavedScreen({super.key});
 
   @override
-  State<SavedScreen> createState() => _SavedScreenState();
-}
-
-class _SavedScreenState extends State<SavedScreen> {
-  final _saved = <_SavedCourse>[
-    const _SavedCourse(
-      '공주 감성 하루 코스',
-      '공산성 · 중동식당 · 제민천 카페',
-      'GONGJU',
-      Icons.account_balance_rounded,
-      AppTheme.coral,
-    ),
-    const _SavedCourse(
-      '부여에서 만나는 백제',
-      '백제문화단지 · 궁남지 · 로스터리',
-      'BUYEO',
-      Icons.park_rounded,
-      AppTheme.accent,
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('찜한 코스'),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 20),
-          child: Center(
-            child: Text(
-              '${_saved.length} saved',
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                color: AppTheme.textSecondary,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final saved = ref.watch(savedCoursesProvider);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('찜한 코스'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 20),
+            child: Center(
+              child: Text(
+                '${saved.length}개',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.textSecondary,
+                ),
               ),
             ),
           ),
-        ),
-      ],
-    ),
-    body: _saved.isEmpty
-        ? const _SavedEmpty()
-        : ListView(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
-            children: [
-              const Text(
-                '나중에 다시 떠나고 싶은\n여행을 모아두었어요.',
-                style: TextStyle(
-                  fontSize: 24,
-                  height: 1.25,
-                  letterSpacing: -0.8,
-                  fontWeight: FontWeight.w900,
+        ],
+      ),
+      body: saved.isEmpty
+          ? const _SavedEmpty()
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+              children: [
+                const Text(
+                  '다시 떠나고 싶은\n여행을 모아두었어요.',
+                  style: TextStyle(
+                    fontSize: 26,
+                    height: 1.24,
+                    letterSpacing: -0.9,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '코스를 누르면 바로 여행을 이어갈 수 있어요.',
-                style: TextStyle(color: AppTheme.textSecondary),
-              ),
-              const SizedBox(height: 24),
-              ..._saved.map(
-                (course) => _SavedCard(
-                  course: course,
-                  onRemove: () => setState(() => _saved.remove(course)),
-                  onStart: () => context.go('/map'),
+                const SizedBox(height: 8),
+                const Text(
+                  '홈에서 저장한 조합이 이곳에 바로 반영돼요.',
+                  style: TextStyle(color: AppTheme.textSecondary),
                 ),
-              ),
-            ],
-          ),
-  );
+                const SizedBox(height: 24),
+                ...saved.asMap().entries.map(
+                  (entry) => _SavedCard(
+                    course: entry.value,
+                    index: entry.key,
+                    onRemove: () => ref
+                        .read(savedCoursesProvider.notifier)
+                        .remove(entry.value.id),
+                    onStart: () => context.go('/map'),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
 }
 
 class _SavedCard extends StatelessWidget {
   const _SavedCard({
     required this.course,
+    required this.index,
     required this.onRemove,
     required this.onStart,
   });
-  final _SavedCourse course;
+  final SavedCourse course;
+  final int index;
   final VoidCallback onRemove;
   final VoidCallback onStart;
 
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    clipBehavior: Clip.antiAlias,
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(24),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.045),
-          blurRadius: 18,
-          offset: const Offset(0, 7),
-        ),
-      ],
-    ),
-    child: Column(
-      children: [
-        Container(
-          height: 116,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                course.color.withValues(alpha: 0.9),
-                course.color.withValues(alpha: 0.48),
-              ],
-            ),
+  Widget build(BuildContext context) {
+    final color = _colors[index % _colors.length];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 7),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.22),
-                  borderRadius: BorderRadius.circular(16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
                 ),
-                child: Icon(course.icon, color: Colors.white, size: 27),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  course.region,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
               const Spacer(),
               IconButton(
                 onPressed: onRemove,
-                icon: const Icon(Icons.bookmark_rounded, color: Colors.white),
+                tooltip: '찜 해제',
+                icon: const Icon(
+                  Icons.bookmark_rounded,
+                  color: AppTheme.primary,
+                ),
               ),
             ],
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      course.region,
+          const SizedBox(height: 8),
+          Text(
+            course.title,
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...course.places.asMap().entries.map(
+            (place) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 26,
+                    height: 26,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${place.key + 1}',
                       style: TextStyle(
-                        color: course.color,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      course.title,
-                      style: const TextStyle(
-                        fontSize: 17,
+                        color: color,
+                        fontSize: 11,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      course.places,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textSecondary,
-                      ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      place.value,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              IconButton(
-                onPressed: onStart,
-                icon: const Icon(Icons.arrow_forward_rounded),
-                style: IconButton.styleFrom(
-                  backgroundColor: AppTheme.background,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(height: 6),
+          FilledButton.icon(
+            onPressed: onStart,
+            icon: const Icon(Icons.navigation_rounded, size: 18),
+            label: const Text('이 코스로 출발하기'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _SavedCourse {
-  const _SavedCourse(
-    this.title,
-    this.places,
-    this.region,
-    this.icon,
-    this.color,
-  );
-  final String title;
-  final String places;
-  final String region;
-  final IconData icon;
-  final Color color;
-}
+const _colors = [AppTheme.coral, AppTheme.accent, Color(0xFF6B68D9)];
 
 class _SavedEmpty extends StatelessWidget {
   const _SavedEmpty();
@@ -231,7 +216,7 @@ class _SavedEmpty extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         const Text(
-          '마음에 드는 여행을 저장해보세요.',
+          '홈에서 마음에 드는 조합을 저장해보세요.',
           style: TextStyle(color: AppTheme.textSecondary),
         ),
       ],

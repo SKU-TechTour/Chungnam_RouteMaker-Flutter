@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 /// [MilitaryRepository]가 API + 채널을 조합합니다.
 class LiveWidgetChannel {
   LiveWidgetChannel({MethodChannel? channel})
-      : _channel = channel ?? const MethodChannel('com.techtour/live_widget');
+    : _channel = channel ?? const MethodChannel('com.techtour/live_widget');
 
   final MethodChannel _channel;
 

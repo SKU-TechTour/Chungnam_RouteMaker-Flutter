@@ -18,14 +18,14 @@ class UserModel {
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        email: json['email'] as String,
-        profileImage: json['profileImage'] as String?,
-        isMilitary: json['isMilitary'] as bool? ?? false,
-        trainingStartDate: json['trainingStartDate'] != null
-            ? DateTime.parse(json['trainingStartDate'] as String)
-            : null,
-        unitLocation: json['unitLocation'] as String?,
-      );
+    id: json['id'] as String,
+    name: json['name'] as String,
+    email: json['email'] as String,
+    profileImage: json['profileImage'] as String?,
+    isMilitary: json['isMilitary'] as bool? ?? false,
+    trainingStartDate: json['trainingStartDate'] != null
+        ? DateTime.parse(json['trainingStartDate'] as String)
+        : null,
+    unitLocation: json['unitLocation'] as String?,
+  );
 }

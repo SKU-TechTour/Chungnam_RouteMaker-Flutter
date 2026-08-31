@@ -12,16 +12,16 @@ final appRouter = GoRouter(
   initialLocation: '/splash',
   debugLogDiagnostics: false,
   routes: [
-    GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
-    GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingScreen()),
-    GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+    GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
+    GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
+    GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
     ShellRoute(
       builder: (context, state, child) => MainShell(child: child),
       routes: [
-        GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
-        GoRoute(path: '/map', builder: (_, __) => const MapScreen()),
-        GoRoute(path: '/saved', builder: (_, __) => const SavedScreen()),
-        GoRoute(path: '/history', builder: (_, __) => const MyHistoryScreen()),
+        GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
+        GoRoute(path: '/map', builder: (_, _) => const MapScreen()),
+        GoRoute(path: '/saved', builder: (_, _) => const SavedScreen()),
+        GoRoute(path: '/history', builder: (_, _) => const MyHistoryScreen()),
       ],
     ),
   ],

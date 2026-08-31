@@ -147,69 +147,80 @@ class _OnboardingPage extends StatelessWidget {
   final _OnboardingItem item;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      Container(
-        height: 310,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: item.background,
-          borderRadius: BorderRadius.circular(36),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final illustrationHeight = constraints.maxHeight < 560 ? 210.0 : 310.0;
+      return SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 190,
-              height: 190,
+              height: illustrationHeight,
+              width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.62),
-                shape: BoxShape.circle,
+                color: item.background,
+                borderRadius: BorderRadius.circular(36),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: illustrationHeight * 0.62,
+                    height: illustrationHeight * 0.62,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.62),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  Icon(
+                    item.icon,
+                    color: item.color,
+                    size: illustrationHeight * 0.28,
+                  ),
+                  Positioned(top: 28, left: 28, child: _Dot(color: item.color)),
+                  Positioned(
+                    bottom: 30,
+                    right: 34,
+                    child: _Dot(color: item.color, small: true),
+                  ),
+                ],
               ),
             ),
-            Icon(item.icon, color: item.color, size: 86),
-            Positioned(top: 34, left: 32, child: _Dot(color: item.color)),
-            Positioned(
-              bottom: 42,
-              right: 40,
-              child: _Dot(color: item.color, small: true),
+            SizedBox(height: constraints.maxHeight < 560 ? 24 : 46),
+            Text(
+              item.eyebrow,
+              style: TextStyle(
+                color: item.color,
+                letterSpacing: 1.4,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              item.title,
+              style: const TextStyle(
+                fontSize: 30,
+                height: 1.22,
+                letterSpacing: -1.1,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              item.description,
+              style: const TextStyle(
+                fontSize: 16,
+                height: 1.55,
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
-      ),
-      const SizedBox(height: 46),
-      Text(
-        item.eyebrow,
-        style: TextStyle(
-          color: item.color,
-          letterSpacing: 1.4,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-      const SizedBox(height: 12),
-      Text(
-        item.title,
-        style: const TextStyle(
-          fontSize: 30,
-          height: 1.22,
-          letterSpacing: -1.1,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-      const SizedBox(height: 16),
-      Text(
-        item.description,
-        style: const TextStyle(
-          fontSize: 16,
-          height: 1.55,
-          color: AppTheme.textSecondary,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    ],
+      );
+    },
   );
 }
 

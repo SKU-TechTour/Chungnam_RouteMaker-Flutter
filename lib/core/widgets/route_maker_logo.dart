@@ -15,35 +15,26 @@ class RouteMakerLogo extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: compact ? 36 : 52,
-          height: compact ? 36 : 52,
+          width: compact ? 40 : 58,
+          height: compact ? 40 : 58,
+          padding: EdgeInsets.all(compact ? 3 : 4),
           decoration: BoxDecoration(
-            color: light
-                ? Colors.white.withValues(alpha: 0.14)
-                : AppTheme.primary,
-            borderRadius: BorderRadius.circular(compact ? 12 : 18),
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Icon(
-                Icons.route_rounded,
-                color: light ? Colors.white : AppTheme.softMint,
-                size: compact ? 22 : 30,
-              ),
-              Positioned(
-                right: compact ? 6 : 9,
-                top: compact ? 6 : 9,
-                child: Container(
-                  width: compact ? 6 : 8,
-                  height: compact ? 6 : 8,
-                  decoration: const BoxDecoration(
-                    color: AppTheme.coral,
-                    shape: BoxShape.circle,
-                  ),
-                ),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(compact ? 13 : 20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 5),
               ),
             ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(compact ? 10 : 16),
+            child: Image.asset(
+              'assets/images/brand/chungnam_route_maker_logo.png',
+              fit: BoxFit.cover,
+            ),
           ),
         ),
         if (!compact) ...[
@@ -53,16 +44,16 @@ class RouteMakerLogo extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'ROUTE MAKER',
+                '충남 루트메이커',
                 style: TextStyle(
                   color: foreground,
-                  fontSize: 16,
+                  fontSize: 17,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.5,
                 ),
               ),
               Text(
-                '충남 여행 큐레이터',
+                'CHUNGNAM ROUTE MAKER',
                 style: TextStyle(
                   color: foreground.withValues(alpha: 0.62),
                   fontSize: 11,

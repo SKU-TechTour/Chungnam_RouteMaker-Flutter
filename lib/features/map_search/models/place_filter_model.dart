@@ -16,20 +16,19 @@ class PlaceFilterModel {
     bool? pet,
     bool? parking,
     String? region,
-  }) =>
-      PlaceFilterModel(
-        stroller: stroller ?? this.stroller,
-        pet: pet ?? this.pet,
-        parking: parking ?? this.parking,
-        region: region ?? this.region,
-      );
+  }) => PlaceFilterModel(
+    stroller: stroller ?? this.stroller,
+    pet: pet ?? this.pet,
+    parking: parking ?? this.parking,
+    region: region ?? this.region,
+  );
 
   Map<String, dynamic> toJson() => {
-        'stroller': stroller,
-        'pet': pet,
-        'parking': parking,
-        'region': region,
-      };
+    'stroller': stroller,
+    'pet': pet,
+    'parking': parking,
+    'region': region,
+  };
 }
 
 class MapPlaceModel {
@@ -50,11 +49,11 @@ class MapPlaceModel {
   });
 
   factory MapPlaceModel.fromJson(Map<String, dynamic> json) => MapPlaceModel(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        category: json['category'] as String,
-        lat: (json['lat'] as num).toDouble(),
-        lng: (json['lng'] as num).toDouble(),
-        imageUrl: json['imageUrl'] as String?,
-      );
+    id: json['id'] as String,
+    name: json['name'] as String,
+    category: json['category'] as String,
+    lat: (json['lat'] as num).toDouble(),
+    lng: (json['lng'] as num).toDouble(),
+    imageUrl: json['imageUrl'] as String?,
+  );
 }

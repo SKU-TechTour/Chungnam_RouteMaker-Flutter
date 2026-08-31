@@ -31,34 +31,34 @@ class _ReceiptShareScreenState extends ConsumerState<ReceiptShareScreen> {
       body: switch ((state.isLoading, state.errorMessage)) {
         (true, _) => const LoadingWidget(),
         (_, String msg) => AppErrorWidget(
-            message: msg,
-            onRetry: notifier.loadHistory,
-          ),
+          message: msg,
+          onRetry: notifier.loadHistory,
+        ),
         _ => ListView.builder(
-            itemCount: state.receipts.length,
-            itemBuilder: (context, index) {
-              final receipt = state.receipts[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  title: Text(receipt.title),
-                  subtitle: Text('${receipt.amount}원 · ${receipt.visitedAt}'),
-                  trailing: IconButton(
-                    icon: state.isSharing
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.share),
-                    onPressed: state.isSharing
-                        ? null
-                        : () => notifier.shareReceipt(receipt.id),
-                  ),
+          itemCount: state.receipts.length,
+          itemBuilder: (context, index) {
+            final receipt = state.receipts[index];
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: ListTile(
+                title: Text(receipt.title),
+                subtitle: Text('${receipt.amount}원 · ${receipt.visitedAt}'),
+                trailing: IconButton(
+                  icon: state.isSharing
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.share),
+                  onPressed: state.isSharing
+                      ? null
+                      : () => notifier.shareReceipt(receipt.id),
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
+        ),
       },
     );
   }

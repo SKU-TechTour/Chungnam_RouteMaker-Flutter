@@ -11,29 +11,34 @@ class DioClient {
 
   static final DioClient instance = DioClient._();
 
-  late final Dio dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConstants.baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {'Content-Type': 'application/json'},
-    ),
-  )..interceptors.add(
-      InterceptorsWrapper(
-        onError: (error, handler) {
-          final response = error.response;
-          handler.reject(
-            DioException(
-              requestOptions: error.requestOptions,
-              response: response,
-              type: error.type,
-              error: ApiException(
-                message: response?.data?.toString() ?? error.message ?? 'Unknown error',
-                statusCode: response?.statusCode,
-              ),
-            ),
-          );
-        },
-      ),
-    );
+  late final Dio dio =
+      Dio(
+          BaseOptions(
+            baseUrl: ApiConstants.baseUrl,
+            connectTimeout: const Duration(seconds: 10),
+            receiveTimeout: const Duration(seconds: 10),
+            headers: {'Content-Type': 'application/json'},
+          ),
+        )
+        ..interceptors.add(
+          InterceptorsWrapper(
+            onError: (error, handler) {
+              final response = error.response;
+              handler.reject(
+                DioException(
+                  requestOptions: error.requestOptions,
+                  response: response,
+                  type: error.type,
+                  error: ApiException(
+                    message:
+                        response?.data?.toString() ??
+                        error.message ??
+                        'Unknown error',
+                    statusCode: response?.statusCode,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
 }

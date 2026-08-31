@@ -108,19 +108,6 @@ class LoginScreen extends ConsumerWidget {
                               onTap: () =>
                                   _signIn(context, viewModel.loginWithGoogle),
                             ),
-                            const SizedBox(height: 10),
-                            _SocialButton(
-                              label: '카카오로 계속하기',
-                              color: const Color(0xFFFEE500),
-                              foreground: const Color(0xFF281F00),
-                              icon: const Icon(
-                                Icons.chat_bubble_rounded,
-                                color: Color(0xFF281F00),
-                                size: 19,
-                              ),
-                              onTap: () =>
-                                  _signIn(context, viewModel.loginWithKakao),
-                            ),
                             const SizedBox(height: 14),
                             TextButton.icon(
                               onPressed: () =>
@@ -174,19 +161,15 @@ class _SocialButton extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onTap,
-    this.color = Colors.white,
-    this.foreground = AppTheme.textPrimary,
   });
 
   final String label;
   final Widget icon;
   final VoidCallback onTap;
-  final Color color;
-  final Color foreground;
 
   @override
   Widget build(BuildContext context) => Material(
-    color: color,
+    color: Colors.white,
     borderRadius: BorderRadius.circular(16),
     child: InkWell(
       onTap: onTap,
@@ -194,9 +177,7 @@ class _SocialButton extends StatelessWidget {
       child: Container(
         height: 56,
         decoration: BoxDecoration(
-          border: Border.all(
-            color: color == Colors.white ? AppTheme.divider : color,
-          ),
+          border: Border.all(color: AppTheme.divider),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -206,7 +187,10 @@ class _SocialButton extends StatelessWidget {
             const SizedBox(width: 10),
             Text(
               label,
-              style: TextStyle(color: foreground, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ],
         ),

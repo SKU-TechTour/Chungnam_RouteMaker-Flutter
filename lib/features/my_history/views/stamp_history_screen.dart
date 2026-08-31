@@ -24,9 +24,7 @@ class _StampHistoryScreenState extends ConsumerState<StampHistoryScreen> {
     final state = ref.watch(myHistoryViewModelProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('스탬프 ${state.stampCount}개'),
-      ),
+      appBar: AppBar(title: Text('스탬프 ${state.stampCount}개')),
       body: state.stamps.isEmpty
           ? const Center(child: Text('아직 획득한 스탬프가 없습니다'))
           : ListView.builder(

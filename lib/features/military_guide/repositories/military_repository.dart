@@ -5,11 +5,12 @@ import 'package:flutterprojects/features/military_guide/data/platform/live_widge
 
 /// [SB 화면 2] 훈련소 가이드 API + 라이브 위젯 채널 조합.
 class MilitaryRepository {
-  MilitaryRepository({
+  factory MilitaryRepository({
     required Dio dio,
     required LiveWidgetChannel liveWidgetChannel,
-  }) : _dio = dio,
-       _liveWidgetChannel = liveWidgetChannel;
+  }) => MilitaryRepository._(dio, liveWidgetChannel);
+
+  MilitaryRepository._(this._dio, this._liveWidgetChannel);
 
   final Dio _dio;
   final LiveWidgetChannel _liveWidgetChannel;

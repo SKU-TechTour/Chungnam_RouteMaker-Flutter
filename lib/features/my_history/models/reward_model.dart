@@ -12,11 +12,11 @@ class StampModel {
   });
 
   factory StampModel.fromJson(Map<String, dynamic> json) => StampModel(
-        id: json['id'] as String,
-        region: json['region'] as String,
-        courseName: json['courseName'] as String,
-        completedAt: DateTime.parse(json['completedAt'] as String),
-      );
+    id: json['id'] as String,
+    region: json['region'] as String,
+    courseName: json['courseName'] as String,
+    completedAt: DateTime.parse(json['completedAt'] as String),
+  );
 }
 
 class BadgeModel {
@@ -35,12 +35,12 @@ class BadgeModel {
   });
 
   factory BadgeModel.fromJson(Map<String, dynamic> json) => BadgeModel(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        description: json['description'] as String,
-        imageUrl: json['imageUrl'] as String?,
-        isChakPartner: json['isChakPartner'] as bool? ?? false,
-      );
+    id: json['id'] as String,
+    name: json['name'] as String,
+    description: json['description'] as String,
+    imageUrl: json['imageUrl'] as String?,
+    isChakPartner: json['isChakPartner'] as bool? ?? false,
+  );
 }
 
 class RewardModel {
@@ -55,12 +55,12 @@ class RewardModel {
   });
 
   factory RewardModel.fromJson(Map<String, dynamic> json) => RewardModel(
-        stamps: (json['stamps'] as List)
-            .map((e) => StampModel.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        badges: (json['badges'] as List)
-            .map((e) => BadgeModel.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        shareCardUrl: json['shareCardUrl'] as String?,
-      );
+    stamps: (json['stamps'] as List)
+        .map((e) => StampModel.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    badges: (json['badges'] as List)
+        .map((e) => BadgeModel.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    shareCardUrl: json['shareCardUrl'] as String?,
+  );
 }
