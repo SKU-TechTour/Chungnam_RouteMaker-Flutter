@@ -492,7 +492,8 @@ class _RegionCombo {
     required this.duration,
     required this.sights,
     required this.foods,
-    required this.stays,
+    required this.healing,
+    required this.activities,
     required this.cafes,
   });
   final String code;
@@ -500,7 +501,8 @@ class _RegionCombo {
   final String duration;
   final List<String> sights;
   final List<String> foods;
-  final List<String> stays;
+  final List<String> healing;
+  final List<String> activities;
   final List<String> cafes;
 }
 
@@ -511,7 +513,8 @@ const _combos = [
     duration: '약 4시간 20분',
     sights: ['선샤인 스튜디오', '탑정호 출렁다리', '관촉사', '돈암서원', '강경근대역사문화거리'],
     foods: ['황산옥', '태능초가집갈비', '연산시장 순대', '삼동소바 논산점'],
-    stays: ['KT&G 상상마당 논산 아트캠핑빌리지', '스테이인터뷰 강경'],
+    healing: ['탑정호', '관촉사', '돈암서원'],
+    activities: ['탑정호 출렁다리', '강경근대역사문화거리', '선샤인 스튜디오'],
     cafes: ['강경구락부', '알바노', '카페 아늑'],
   ),
   _RegionCombo(
@@ -530,7 +533,8 @@ const _combos = [
       '동학사',
     ],
     foods: ['동해원', '금강관', '새이학가든', '신흥면옥'],
-    stays: ['공주한옥마을'],
+    healing: ['동학사', '공주한옥마을'],
+    activities: ['계룡산도예촌', '석장리박물관'],
     cafes: ['베이커리 인화당', '하루카페&밤떡명가'],
   ),
   _RegionCombo(
@@ -547,9 +551,12 @@ const _combos = [
       '서동요테마파크',
       '부여 가림성',
       '무량사',
+      '궁남지',
+      '황포돛배',
     ],
     foods: ['장원막국수', '엄가네곰탕', '삼정식당', '나루터식당', '백제향'],
-    stays: ['흰구름 밝은달'],
+    healing: ['궁남지', '성흥산성 사랑나무', '무량사'],
+    activities: ['황포돛배', '서동요테마파크', '부여 가림성'],
     cafes: ['카페 수북로1945', '무드빌리지'],
   ),
 ];
@@ -674,9 +681,10 @@ class _ConceptCatalog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final entries = <(TravelConcept, List<String>)>[
+      (TravelConcept.healing, combo.healing),
+      (TravelConcept.activity, combo.activities),
       (TravelConcept.history, combo.sights),
       (TravelConcept.food, combo.foods),
-      (TravelConcept.stay, combo.stays),
       (TravelConcept.cafe, combo.cafes),
     ].where((entry) => concepts.contains(entry.$1)).toList();
 

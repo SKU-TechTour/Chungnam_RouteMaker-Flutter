@@ -250,8 +250,9 @@ class _PartyCard extends StatelessWidget {
 }
 
 IconData _conceptIcon(TravelConcept concept) => switch (concept) {
+  TravelConcept.healing => Icons.spa_rounded,
+  TravelConcept.activity => Icons.directions_walk_rounded,
   TravelConcept.history => Icons.account_balance_rounded,
   TravelConcept.food => Icons.restaurant_rounded,
-  TravelConcept.stay => Icons.bed_rounded,
   TravelConcept.cafe => Icons.local_cafe_rounded,
 };

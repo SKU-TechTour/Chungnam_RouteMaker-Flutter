@@ -1,6 +1,6 @@
 enum TravelParty {
   enlistingSoldier('입대 장병', '논산훈련소 입영 전후 동선을 중심으로 추천해요.'),
-  companion('동행 지인', '배웅 전후 함께 머물 코스를 중심으로 추천해요.');
+  companion('동행지인 / 여행객', '배웅 또는 일반 여행 목적에 맞는 코스를 추천해요.');
 
   const TravelParty(this.label, this.description);
 
@@ -9,9 +9,10 @@ enum TravelParty {
 }
 
 enum TravelConcept {
+  healing('힐링'),
+  activity('액티비티'),
   history('역사'),
   food('맛집'),
-  stay('숙소'),
   cafe('카페');
 
   const TravelConcept(this.label);
