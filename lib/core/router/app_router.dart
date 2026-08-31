@@ -7,6 +7,7 @@ import '../../features/map_search/views/map_screen.dart';
 import '../../features/my_history/views/my_history_screen.dart';
 import '../../features/saved/views/saved_screen.dart';
 import '../../features/home_curation/views/main_shell.dart';
+import '../../features/travel_preferences/views/travel_preferences_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/splash',
@@ -15,6 +16,10 @@ final appRouter = GoRouter(
     GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
     GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
     GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+    GoRoute(
+      path: '/preferences',
+      builder: (_, _) => const TravelPreferencesScreen(),
+    ),
     ShellRoute(
       builder: (context, state, child) => MainShell(child: child),
       routes: [

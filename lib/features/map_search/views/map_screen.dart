@@ -10,7 +10,7 @@ import '../viewmodels/map_search_state.dart';
 import '../views/kakao_map_widget.dart';
 
 const _regionCenters = {
-  'NONSAN': ll.LatLng(36.2004, 127.0956),
+  'NONSAN': ll.LatLng(36.1119731, 127.1083526),
   'GONGJU': ll.LatLng(36.4465, 127.1191),
   'BUYEO': ll.LatLng(36.2757, 126.9100),
 };
@@ -55,6 +55,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       final position = await ref
           .read(locationUtilProvider)
           .getCurrentPosition();
+      ref
+          .read(mapSearchViewModelProvider.notifier)
+          .applyDeviceLocation(position.lat, position.lng);
       if (kIsWeb) {
         _mapController.move(ll.LatLng(position.lat, position.lng), 14);
       } else {
@@ -111,15 +114,28 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           ],
                         ),
                       fm.MarkerLayer(
-                        markers: state.places.asMap().entries.map((entry) {
-                          final place = entry.value;
-                          return fm.Marker(
-                            point: ll.LatLng(place.lat, place.lng),
-                            width: 46,
-                            height: 46,
-                            child: _PlaceMarker(number: entry.key + 1),
-                          );
-                        }).toList(),
+                        markers: [
+                          ...state.places.asMap().entries.map((entry) {
+                            final place = entry.value;
+                            return fm.Marker(
+                              point: ll.LatLng(place.lat, place.lng),
+                              width: 46,
+                              height: 46,
+                              child: _PlaceMarker(number: entry.key + 1),
+                            );
+                          }),
+                          if (state.currentLat != null &&
+                              state.currentLng != null)
+                            fm.Marker(
+                              point: ll.LatLng(
+                                state.currentLat!,
+                                state.currentLng!,
+                              ),
+                              width: 24,
+                              height: 24,
+                              child: const _CurrentLocationMarker(),
+                            ),
+                        ],
                       ),
                     ],
                   )
@@ -465,6 +481,15 @@ class _RoutePreview extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        if (entry.value.formattedDistance case final distance?)
+                          Text(
+                            distance,
+                            style: const TextStyle(
+                              color: AppTheme.accent,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -485,4 +510,20 @@ class _RoutePreview extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CurrentLocationMarker extends StatelessWidget {
+  const _CurrentLocationMarker();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: const Color(0xFF3478F6),
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.white, width: 4),
+      boxShadow: [
+        BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 7),
+      ],
+    ),
+  );
 }

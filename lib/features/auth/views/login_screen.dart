@@ -14,7 +14,7 @@ class LoginScreen extends ConsumerWidget {
     BuildContext context,
     Future<bool> Function() action,
   ) async {
-    if (await action() && context.mounted) context.go('/home');
+    if (await action() && context.mounted) context.go('/preferences');
   }
 
   @override

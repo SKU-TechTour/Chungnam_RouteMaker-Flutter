@@ -2,8 +2,8 @@ import 'package:geolocator/geolocator.dart';
 
 /// 기기 GPS 좌표 획득 유틸.
 ///
-/// [map_search] feature의 ViewModel에서 호출하여
-/// 주변 장소 필터 API 요청에 lat/lng를 포함합니다.
+/// [map_search] feature의 ViewModel에서 호출합니다.
+/// 현재 좌표는 서버로 전송하지 않고 기기 안에서 거리 계산에만 사용합니다.
 class LocationUtil {
   const LocationUtil();
 
@@ -27,4 +27,11 @@ class LocationUtil {
     final position = await Geolocator.getCurrentPosition();
     return (lat: position.latitude, lng: position.longitude);
   }
+
+  double distanceInMeters({
+    required double fromLat,
+    required double fromLng,
+    required double toLat,
+    required double toLng,
+  }) => Geolocator.distanceBetween(fromLat, fromLng, toLat, toLng);
 }

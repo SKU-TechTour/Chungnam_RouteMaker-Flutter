@@ -19,7 +19,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _OnboardingItem(
       eyebrow: 'CURATED FOR YOU',
       title: '하루가 가벼워지는\n세 곳의 조합',
-      description: '보고, 먹고, 쉬는 곳까지.\n당신의 취향으로 여행을 엮어드려요.',
+      description: '충남의 핵심 지역인 공주·부여·논산을 중심으로\n당신의 취향에 맞는 여행 큐레이션을 제공해요.',
       icon: Icons.auto_awesome_rounded,
       color: AppTheme.coral,
       background: AppTheme.softCoral,

@@ -9,6 +9,7 @@ import 'package:flutterprojects/features/saved/views/saved_screen.dart';
 import 'package:flutterprojects/features/my_history/views/my_history_screen.dart';
 import 'package:flutterprojects/features/my_history/views/receipt_share_screen.dart';
 import 'package:flutterprojects/features/my_history/views/stamp_history_screen.dart';
+import 'package:flutterprojects/features/travel_preferences/views/travel_preferences_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/splash',
@@ -19,6 +20,10 @@ final appRouter = GoRouter(
       builder: (context, state) => const OnboardingScreen(),
     ),
     GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+    GoRoute(
+      path: '/preferences',
+      builder: (context, state) => const TravelPreferencesScreen(),
+    ),
     ShellRoute(
       builder: (context, state, child) => MainShell(child: child),
       routes: [

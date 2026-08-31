@@ -7,6 +7,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/route_maker_logo.dart';
 import '../../saved/models/saved_course.dart';
 import '../../saved/viewmodels/saved_courses_provider.dart';
+import '../../travel_preferences/models/travel_preferences.dart';
+import '../../travel_preferences/repositories/travel_preferences_repository.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +22,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   var _sightIndex = 0;
   var _foodIndex = 0;
   var _cafeIndex = 0;
+  var _party = TravelParty.companion;
+  Set<TravelConcept> _concepts = TravelConcept.values.toSet();
+
+  final _preferencesRepository = TravelPreferencesRepository();
 
   _RegionCombo get _combo => _combos[_regionIndex];
 
@@ -27,6 +33,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     Future.microtask(_loadRegion);
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final preferences = await _preferencesRepository.load();
+    if (preferences == null || !mounted) return;
+    setState(() {
+      _party = preferences.party;
+      _concepts = preferences.concepts;
+    });
+  }
+
+  Future<void> _selectParty(TravelParty party) async {
+    setState(() => _party = party);
+    await _preferencesRepository.save(
+      TravelPreferences(party: party, concepts: _concepts),
+    );
   }
 
   void _loadRegion() {
@@ -50,6 +73,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     region: _combo.name,
     title: '${_combo.name} 취향 맞춤 3단 콤보',
     places: [
+      if (_combo.code == 'NONSAN') '육군훈련소',
       _combo.sights[_sightIndex],
       _combo.foods[_foodIndex],
       _combo.cafes[_cafeIndex],
@@ -125,6 +149,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     selected: _regionIndex,
                     onSelected: _selectRegion,
                   ),
+                  if (_combo.code == 'NONSAN') ...[
+                    const SizedBox(height: 16),
+                    _NonsanEntryCard(party: _party, onChanged: _selectParty),
+                  ],
+                  const SizedBox(height: 16),
+                  _PreferenceSummary(
+                    concepts: _concepts,
+                    onEdit: () => context.push('/preferences'),
+                  ),
                   const SizedBox(height: 26),
                   Row(
                     children: [
@@ -179,6 +212,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
+                  _ConceptCatalog(combo: _combo, concepts: _concepts),
+                  const SizedBox(height: 18),
                   _ComboStep(
                     number: 1,
                     label: '볼거리',
@@ -457,6 +492,7 @@ class _RegionCombo {
     required this.duration,
     required this.sights,
     required this.foods,
+    required this.stays,
     required this.cafes,
   });
   final String code;
@@ -464,6 +500,7 @@ class _RegionCombo {
   final String duration;
   final List<String> sights;
   final List<String> foods;
+  final List<String> stays;
   final List<String> cafes;
 }
 
@@ -472,24 +509,207 @@ const _combos = [
     code: 'NONSAN',
     name: '논산',
     duration: '약 4시간 20분',
-    sights: ['선샤인 스튜디오', '탑정호 출렁다리', '관촉사'],
-    foods: ['연무대 골목 고기집', '논산 딸기 한상', '강경 젓갈 백반'],
-    cafes: ['탑정호 베이커리카페', '강경 구락부 카페', '연산 로컬 티룸'],
+    sights: ['선샤인 스튜디오', '탑정호 출렁다리', '관촉사', '돈암서원', '강경근대역사문화거리'],
+    foods: ['황산옥', '태능초가집갈비', '연산시장 순대', '삼동소바 논산점'],
+    stays: ['KT&G 상상마당 논산 아트캠핑빌리지', '스테이인터뷰 강경'],
+    cafes: ['강경구락부', '알바노', '카페 아늑'],
   ),
   _RegionCombo(
     code: 'GONGJU',
     name: '공주',
     duration: '약 4시간 40분',
-    sights: ['공산성', '국립공주박물관', '제민천 산책길'],
-    foods: ['중동 오일장 국밥', '공주 알밤 한상', '산성시장 분식'],
-    cafes: ['제민천 카페', '금강뷰 로스터리', '봉황동 책방카페'],
+    sights: [
+      '무령왕릉과 왕릉원',
+      '공산성',
+      '국립공주박물관',
+      '공주한옥마을',
+      '석장리박물관',
+      '계룡산도예촌',
+      '계룡산자연사박물관',
+      '박동진판소리전수관',
+      '동학사',
+    ],
+    foods: ['동해원', '금강관', '새이학가든', '신흥면옥'],
+    stays: ['공주한옥마을'],
+    cafes: ['베이커리 인화당', '하루카페&밤떡명가'],
   ),
   _RegionCombo(
     code: 'BUYEO',
     name: '부여',
     duration: '약 5시간',
-    sights: ['백제문화단지', '궁남지', '부소산성'],
-    foods: ['연잎밥 식당', '부여 한우 골목', '백마강 어죽'],
-    cafes: ['궁남지 로스터리', '규암 책방카페', '백마강 뷰 카페'],
+    sights: [
+      '백제문화단지',
+      '성흥산성 사랑나무',
+      '부소산성',
+      '국립부여박물관',
+      '정림사지박물관',
+      '부여 왕릉원(능산리고분군)',
+      '서동요테마파크',
+      '부여 가림성',
+      '무량사',
+    ],
+    foods: ['장원막국수', '엄가네곰탕', '삼정식당', '나루터식당', '백제향'],
+    stays: ['흰구름 밝은달'],
+    cafes: ['카페 수북로1945', '무드빌리지'],
   ),
 ];
+
+class _NonsanEntryCard extends StatelessWidget {
+  const _NonsanEntryCard({required this.party, required this.onChanged});
+
+  final TravelParty party;
+  final ValueChanged<TravelParty> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: AppTheme.primary,
+      borderRadius: BorderRadius.circular(24),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.flag_rounded, color: Colors.white),
+            SizedBox(width: 9),
+            Text(
+              '논산 여정의 기준 · 육군훈련소',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        Text(
+          '입영 대상에 따라 훈련소 도착 전후 코스를 다르게 구성해요.',
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.72),
+            fontSize: 12,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 14),
+        SegmentedButton<TravelParty>(
+          segments: TravelParty.values
+              .map(
+                (value) => ButtonSegment(
+                  value: value,
+                  label: Text(value.label),
+                  icon: Icon(
+                    value == TravelParty.enlistingSoldier
+                        ? Icons.person_rounded
+                        : Icons.groups_rounded,
+                  ),
+                ),
+              )
+              .toList(),
+          selected: {party},
+          onSelectionChanged: (value) => onChanged(value.first),
+          style: ButtonStyle(
+            backgroundColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.selected)
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.08),
+            ),
+            foregroundColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.selected)
+                  ? AppTheme.primary
+                  : Colors.white,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Row(
+          children: [
+            Icon(Icons.shield_outlined, size: 16, color: Colors.white70),
+            SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'GPS와 훈련소까지의 거리 계산은 기기 안에서만 처리돼요.',
+                style: TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+class _PreferenceSummary extends StatelessWidget {
+  const _PreferenceSummary({required this.concepts, required this.onEdit});
+
+  final Set<TravelConcept> concepts;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: Text(
+          concepts.map((concept) => '#${concept.label}').join('  '),
+          maxLines: 2,
+          style: const TextStyle(
+            color: AppTheme.primary,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+      TextButton(onPressed: onEdit, child: const Text('취향 변경')),
+    ],
+  );
+}
+
+class _ConceptCatalog extends StatelessWidget {
+  const _ConceptCatalog({required this.combo, required this.concepts});
+
+  final _RegionCombo combo;
+  final Set<TravelConcept> concepts;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = <(TravelConcept, List<String>)>[
+      (TravelConcept.history, combo.sights),
+      (TravelConcept.food, combo.foods),
+      (TravelConcept.stay, combo.stays),
+      (TravelConcept.cafe, combo.cafes),
+    ].where((entry) => concepts.contains(entry.$1)).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '선택한 취향의 실제 장소',
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 10),
+          ...entries.map(
+            (entry) => Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: Text(
+                '${entry.$1.label}  ·  ${entry.$2.join(' · ')}',
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

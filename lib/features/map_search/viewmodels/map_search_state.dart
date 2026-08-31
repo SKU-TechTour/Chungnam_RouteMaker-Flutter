@@ -10,6 +10,8 @@ class MapSearchState {
     this.region = 'GONGJU',
     this.isLoading = false,
     this.errorMessage,
+    this.currentLat,
+    this.currentLng,
   });
 
   final List<Place> places;
@@ -19,6 +21,8 @@ class MapSearchState {
   final String region;
   final bool isLoading;
   final String? errorMessage;
+  final double? currentLat;
+  final double? currentLng;
 
   MapSearchState copyWith({
     List<Place>? places,
@@ -29,6 +33,8 @@ class MapSearchState {
     bool? isLoading,
     String? errorMessage,
     bool clearError = false,
+    double? currentLat,
+    double? currentLng,
   }) {
     return MapSearchState(
       places: places ?? this.places,
@@ -38,6 +44,8 @@ class MapSearchState {
       region: region ?? this.region,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      currentLat: currentLat ?? this.currentLat,
+      currentLng: currentLng ?? this.currentLng,
     );
   }
 }
