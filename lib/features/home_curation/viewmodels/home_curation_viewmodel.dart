@@ -11,7 +11,11 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
   @override
   HomeCurationState build() => const HomeCurationState();
 
-  Future<void> loadCourses({String region = 'GONGJU'}) async {
+  Future<void> loadCourses({
+    String region = 'GONGJU',
+    bool military = false,
+    Set<String> concepts = const {},
+  }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     final repository = ref.read(courseRepositoryProvider);
     if (ApiConstants.useMockData) {
@@ -19,12 +23,19 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
       state = state.copyWith(courses: courses, isLoading: false);
       return;
     }
+    // 운영 모드에서는 반드시 Spring을 거쳐 실시간 API 경로를 사용합니다.
     try {
-      final courses = await repository.fetchCourses(region: region);
+      final courses = await repository.fetchCourses(
+        region: region,
+        military: military,
+        concepts: concepts,
+      );
       state = state.copyWith(courses: courses, isLoading: false);
-    } catch (_) {
-      final courses = await repository.loadMockCourses(region: region);
-      state = state.copyWith(courses: courses, isLoading: false);
+    } catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: '실시간 관광정보를 불러오지 못했습니다: $error',
+      );
     }
   }
 

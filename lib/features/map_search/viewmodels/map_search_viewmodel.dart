@@ -26,14 +26,19 @@ class MapSearchViewModel extends Notifier<MapSearchState> {
     );
     List<Place> places;
     final repository = ref.read(placeRepositoryProvider);
-    if (ApiConstants.useMockData) {
-      places = await repository.loadMockPlaces(request);
-    } else {
-      try {
-        places = await repository.filterPlaces(request);
-      } catch (_) {
+    try {
+      if (ApiConstants.useMockData) {
         places = await repository.loadMockPlaces(request);
+      } else {
+        // 운영 모드에서는 API 장애를 Mock 데이터로 숨기지 않습니다.
+        places = await repository.filterPlaces(request);
       }
+    } catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: '실시간 관광정보를 불러오지 못했습니다: $error',
+      );
+      return;
     }
 
     final currentLat = state.currentLat;

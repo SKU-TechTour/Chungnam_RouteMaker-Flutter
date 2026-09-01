@@ -3,6 +3,7 @@ class UserModel {
   final String name;
   final String email;
   final String? profileImage;
+  final bool isAnonymous;
   final bool isMilitary;
   final DateTime? trainingStartDate;
   final String? unitLocation;
@@ -12,6 +13,7 @@ class UserModel {
     required this.name,
     required this.email,
     this.profileImage,
+    this.isAnonymous = false,
     this.isMilitary = false,
     this.trainingStartDate,
     this.unitLocation,
@@ -22,6 +24,7 @@ class UserModel {
     name: json['name'] as String,
     email: json['email'] as String,
     profileImage: json['profileImage'] as String?,
+    isAnonymous: json['isAnonymous'] as bool? ?? false,
     isMilitary: json['isMilitary'] as bool? ?? false,
     trainingStartDate: json['trainingStartDate'] != null
         ? DateTime.parse(json['trainingStartDate'] as String)

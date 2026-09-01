@@ -26,11 +26,18 @@ class CourseRepository {
   Future<List<Course>> fetchCourses({
     required String region,
     bool military = false,
+    Set<String> concepts = const {},
+    int variant = 0,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         ApiConstants.courseRecommend,
-        data: {'region': region, 'military': military},
+        data: {
+          'region': region,
+          'military': military,
+          'concepts': concepts.toList(),
+          'variant': variant,
+        },
       );
       final data = response.data?['data'];
       if (data is! Map<String, dynamic>) {

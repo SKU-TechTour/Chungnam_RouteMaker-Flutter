@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutterprojects/core/constants/api_constants.dart';
 import 'package:flutterprojects/core/network/api_exception.dart';
 
@@ -22,6 +24,16 @@ class DioClient {
         )
         ..interceptors.add(
           InterceptorsWrapper(
+            onRequest: (options, handler) async {
+              if (Firebase.apps.isNotEmpty) {
+                final token = await FirebaseAuth.instance.currentUser
+                    ?.getIdToken();
+                if (token != null && token.isNotEmpty) {
+                  options.headers['Authorization'] = 'Bearer $token';
+                }
+              }
+              handler.next(options);
+            },
             onError: (error, handler) {
               final response = error.response;
               handler.reject(

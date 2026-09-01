@@ -3,10 +3,11 @@
 /// [baseUrl]은 환경(dev/staging/prod)별로 분리할 예정이면
 /// `--dart-define` 또는 flavor 설정으로 교체하세요.
 abstract final class ApiConstants {
-  /// Day 2 퍼블리싱 기본값. 실서버 통합 테스트에서는 false로 덮어씁니다.
+  /// 공모전 제출 앱은 한국관광공사 OpenAPI를 실시간 호출합니다.
+  /// Mock은 UI 개발/자동 테스트에서 명시적으로 켠 경우에만 사용합니다.
   static const bool useMockData = bool.fromEnvironment(
     'USE_MOCK_DATA',
-    defaultValue: true,
+    defaultValue: false,
   );
 
   /// Override this with `--dart-define=API_BASE_URL=http://...` for a device.

@@ -29,7 +29,7 @@ class ComboCard extends StatelessWidget {
             ...course.spots.asMap().entries.map(
               (entry) => ListTile(
                 leading: CircleAvatar(child: Text('${entry.key + 1}')),
-                title: Text(entry.value),
+                title: Text(entry.value.name),
               ),
             ),
           ],

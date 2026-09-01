@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "283495436741",
+    "project_id": "chungnam-routemaker",
+    "storage_bucket": "chungnam-routemaker.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:283495436741:android:aa429b6babc7e4f1efbbac",
+        "android_client_info": {
+          "package_name": "com.techtour.flutterprojects"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "283495436741-1kj3h95mmehbr1e0ebmake55mv9naelu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.techtour.flutterprojects",
+            "certificate_hash": "0f8f982b1eb4c103d38777ced81ad50f8f2c91eb"
+          }
+        },
+        {
+          "client_id": "283495436741-nsu9ijpmcuphi88eeugfu40a97s9sj7h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC1xmdxkL_uQOUxIoKMWrVuwnPw20IZNug"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "283495436741-nsu9ijpmcuphi88eeugfu40a97s9sj7h.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "283495436741-nkog3veapbolj9p53ge8c6ou2ij0ij8q.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.techtour.flutterprojects"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
