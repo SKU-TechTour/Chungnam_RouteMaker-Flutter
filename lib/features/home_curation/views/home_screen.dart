@@ -163,9 +163,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        liveCourse?.weatherTag == 'RAINY'
-                            ? '${_combo.name} · 비 예보를 반영한 실내 코스예요'
-                            : '${_combo.name} · 현재 예보를 반영한 코스예요',
+                        liveCourse == null
+                            ? '${_combo.name} · 날씨와 관광정보를 확인하고 있어요'
+                            : liveCourse.weatherTag == 'RAINY'
+                                ? '${_combo.name} · 비 예보를 반영한 실내 코스예요'
+                                : '${_combo.name} · 현재 예보를 반영한 코스예요',
                         style: const TextStyle(
                           color: AppTheme.textSecondary,
                           fontSize: 13,
@@ -251,8 +253,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(height: 16),
                   if (liveCourse != null)
                     _LiveCourseSource(course: liveCourse)
-                  else
+                  else if (ApiConstants.useMockData)
                     _ConceptCatalog(combo: _combo, concepts: _concepts),
+                  if (liveCourse == null && !ApiConstants.useMockData)
+                    const _RealtimeWaitingCard(),
                   const SizedBox(height: 18),
                   _ComboStep(
                     number: 1,
@@ -323,20 +327,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           children: [
                             Expanded(
                               child: OutlinedButton.icon(
-                                onPressed: () {
-                                  ref
-                                      .read(savedCoursesProvider.notifier)
-                                      .toggle(selectedCourse);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        isSaved
-                                            ? '찜에서 삭제했어요.'
-                                            : '찜한 코스에 저장했어요.',
-                                      ),
-                                    ),
-                                  );
-                                },
+                                onPressed: liveCourse != null ||
+                                        ApiConstants.useMockData
+                                    ? () {
+                                        ref
+                                            .read(savedCoursesProvider.notifier)
+                                            .toggle(selectedCourse);
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              isSaved
+                                                  ? '찜에서 삭제했어요.'
+                                                  : '찜한 코스에 저장했어요.',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    : _loadRegion,
                                 icon: Icon(
                                   isSaved
                                       ? Icons.bookmark_rounded
@@ -359,7 +367,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             Expanded(
                               flex: 2,
                               child: FilledButton.icon(
-                                onPressed: () => context.go('/map'),
+                                onPressed: liveCourse != null ||
+                                        ApiConstants.useMockData
+                                    ? () => context.go('/map')
+                                    : _loadRegion,
                                 icon: const Icon(Icons.navigation_rounded),
                                 label: const Text('이 콤보 시작하기'),
                                 style: FilledButton.styleFrom(
@@ -497,6 +508,29 @@ class _ApiErrorBanner extends StatelessWidget {
         ),
         TextButton(onPressed: onRetry, child: const Text('재시도')),
       ],
+    ),
+  );
+}
+
+class _RealtimeWaitingCard extends StatelessWidget {
+  const _RealtimeWaitingCard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: AppTheme.divider),
+    ),
+    child: const Text(
+      '고정 관광지 대신 TourAPI 실시간 응답을 기다리고 있어요.',
+      style: TextStyle(
+        color: AppTheme.textSecondary,
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+      ),
     ),
   );
 }
