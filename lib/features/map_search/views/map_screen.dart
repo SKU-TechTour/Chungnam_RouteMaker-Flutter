@@ -281,6 +281,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ],
                   ),
                 ),
+                if (state.errorMessage case final message?) ...[
+                  const SizedBox(height: 10),
+                  _ApiErrorBanner(message: message, onRetry: _search),
+                ],
                 const Spacer(),
                 _RoutePreview(state: state),
               ],
@@ -290,6 +294,43 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ),
     );
   }
+}
+
+class _ApiErrorBanner extends StatelessWidget {
+  const _ApiErrorBanner({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.symmetric(horizontal: 16),
+    padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF4EF),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFFFC7B2)),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.cloud_off_rounded, color: Color(0xFFB54708)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            message,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF7A2E0E),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        TextButton(onPressed: onRetry, child: const Text('재시도')),
+      ],
+    ),
+  );
 }
 
 class _RegionChip extends StatelessWidget {

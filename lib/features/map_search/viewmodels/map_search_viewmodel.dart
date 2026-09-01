@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutterprojects/core/constants/api_constants.dart';
 import 'package:flutterprojects/core/di/providers.dart';
+import 'package:flutterprojects/core/network/api_exception.dart';
 import 'package:flutterprojects/features/map_search/models/place.dart';
 import 'package:flutterprojects/features/map_search/viewmodels/map_search_state.dart';
 
@@ -36,7 +37,7 @@ class MapSearchViewModel extends Notifier<MapSearchState> {
     } catch (error) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: '실시간 관광정보를 불러오지 못했습니다: $error',
+        errorMessage: _messageFor(error),
       );
       return;
     }
@@ -47,6 +48,19 @@ class MapSearchViewModel extends Notifier<MapSearchState> {
       places = _sortByDistance(places, currentLat, currentLng);
     }
     state = state.copyWith(places: places, isLoading: false);
+  }
+
+  String _messageFor(Object error) {
+    if (error is ApiException) {
+      if (error.statusCode == null) {
+        return '백엔드 서버에 연결할 수 없습니다. Spring 서버를 먼저 실행해주세요.';
+      }
+      if (error.message.contains('환경변수')) {
+        return '서버의 TOUR_API_SERVICE_KEY가 등록되지 않았습니다.';
+      }
+      return 'TourAPI 조회 오류 (${error.statusCode}): ${error.message}';
+    }
+    return '실시간 관광정보를 불러오지 못했습니다: $error';
   }
 
   void applyDeviceLocation(double lat, double lng) {

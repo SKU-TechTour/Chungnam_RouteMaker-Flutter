@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutterprojects/core/constants/api_constants.dart';
 import 'package:flutterprojects/core/di/providers.dart';
+import 'package:flutterprojects/core/network/api_exception.dart';
 import 'package:flutterprojects/features/home_curation/viewmodels/home_curation_state.dart';
 
 /// [SB 화면 1] 카드 스와이프·Plan B 셔플 상태 관리 ViewModel.
@@ -34,9 +35,25 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
     } catch (error) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: '실시간 관광정보를 불러오지 못했습니다: $error',
+        errorMessage: _messageFor(error),
       );
     }
+  }
+
+  String _messageFor(Object error) {
+    if (error is ApiException) {
+      if (error.statusCode == null) {
+        return '백엔드 서버에 연결할 수 없습니다. Spring 서버와 API 주소를 확인해주세요.';
+      }
+      if (error.statusCode == 401 || error.statusCode == 403) {
+        return 'Firebase 인증 설정을 확인해주세요. (${error.statusCode})';
+      }
+      if (error.message.contains('환경변수')) {
+        return '서버의 공공 API 환경변수가 등록되지 않았습니다.';
+      }
+      return '실시간 코스 API 오류 (${error.statusCode}): ${error.message}';
+    }
+    return '실시간 관광정보를 불러오지 못했습니다: $error';
   }
 
   /// Plan B: 다음 코스로 셔플
