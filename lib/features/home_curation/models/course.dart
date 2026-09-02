@@ -10,6 +10,7 @@ class Course {
     this.totalDistanceMeters = 0,
     this.totalDurationSeconds = 0,
     this.source,
+    this.hourlyWeather = const [],
   });
 
   factory Course.fromJson(Map<String, dynamic> json) {
@@ -20,11 +21,16 @@ class Course {
       spots: combo
           .map((e) => CourseSpot.fromJson(e as Map<String, dynamic>))
           .toList(),
-      weatherTag: json['weather'] as String? ??
+      weatherTag:
+          json['weather'] as String? ??
           (json['indoor'] == true ? 'RAINY' : 'CLEAR'),
       totalDistanceMeters: json['totalDistanceMeters'] as int? ?? 0,
       totalDurationSeconds: json['totalDurationSeconds'] as int? ?? 0,
       source: json['source'] as String?,
+      hourlyWeather: (json['hourlyWeather'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(HourlyWeather.fromJson)
+          .toList(),
     );
   }
 
@@ -35,6 +41,7 @@ class Course {
   final int totalDistanceMeters;
   final int totalDurationSeconds;
   final String? source;
+  final List<HourlyWeather> hourlyWeather;
 
   String get formattedDuration {
     if (totalDurationSeconds <= 0) return '시간 계산 중';
@@ -43,6 +50,28 @@ class Course {
     final remaining = minutes % 60;
     return hours > 0 ? '약 $hours시간 $remaining분' : '약 $remaining분';
   }
+}
+
+class HourlyWeather {
+  const HourlyWeather({
+    required this.time,
+    required this.temperature,
+    required this.precipitationProbability,
+    required this.precipitationExpected,
+  });
+
+  factory HourlyWeather.fromJson(Map<String, dynamic> json) => HourlyWeather(
+    time: json['time'] as String? ?? '--:--',
+    temperature: (json['temperature'] as num?)?.round() ?? 0,
+    precipitationProbability:
+        (json['precipitationProbability'] as num?)?.round() ?? 0,
+    precipitationExpected: json['precipitationExpected'] as bool? ?? false,
+  );
+
+  final String time;
+  final int temperature;
+  final int precipitationProbability;
+  final bool precipitationExpected;
 }
 
 class CourseSpot {
@@ -54,17 +83,19 @@ class CourseSpot {
     required this.longitude,
     this.imageUrl,
     this.source,
+    this.address,
   });
 
   factory CourseSpot.fromJson(Map<String, dynamic> json) => CourseSpot(
-        id: json['id'].toString(),
-        name: json['name'] as String,
-        category: json['category'] as String? ?? 'HERITAGE',
-        latitude: (json['latitude'] as num?)?.toDouble() ?? 0,
-        longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
-        imageUrl: json['imageUrl'] as String?,
-        source: json['source'] as String?,
-      );
+    id: json['id'].toString(),
+    name: json['name'] as String,
+    category: json['category'] as String? ?? 'HERITAGE',
+    latitude: (json['latitude'] as num?)?.toDouble() ?? 0,
+    longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
+    imageUrl: json['imageUrl'] as String?,
+    source: json['source'] as String?,
+    address: json['address'] as String?,
+  );
 
   final String id;
   final String name;
@@ -73,4 +104,5 @@ class CourseSpot {
   final double longitude;
   final String? imageUrl;
   final String? source;
+  final String? address;
 }

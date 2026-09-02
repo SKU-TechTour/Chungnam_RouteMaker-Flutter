@@ -1,4 +1,7 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
@@ -14,6 +17,8 @@ class MyHistoryScreen extends ConsumerStatefulWidget {
 }
 
 class _MyHistoryScreenState extends ConsumerState<MyHistoryScreen> {
+  final _receiptCardKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -24,15 +29,24 @@ class _MyHistoryScreenState extends ConsumerState<MyHistoryScreen> {
 
   Future<void> _shareReceipt(BuildContext context) async {
     final box = context.findRenderObject() as RenderBox?;
+    final boundary =
+        _receiptCardKey.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
+    if (boundary == null) return;
+    final image = await boundary.toImage(pixelRatio: 3);
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null || !mounted) return;
     await SharePlus.instance.share(
       ShareParams(
         subject: '충남 루트메이커 여행 기록',
-        text:
-            '🧭 충남 루트메이커 여행 영수증\n\n'
-            '1. 선샤인 스튜디오\n'
-            '2. 연무대 골목 고기집\n'
-            '3. 탑정호 베이커리카페\n\n'
-            '#충남루트메이커 #논산여행 #로컬여행',
+        text: '#충남루트메이커 #논산여행 #로컬여행',
+        files: [
+          XFile.fromData(
+            byteData.buffer.asUint8List(),
+            mimeType: 'image/png',
+            name: 'chungnam-route-card.png',
+          ),
+        ],
         sharePositionOrigin: box == null
             ? null
             : box.localToGlobal(Offset.zero) & box.size,
@@ -173,7 +187,10 @@ class _MyHistoryScreenState extends ConsumerState<MyHistoryScreen> {
                   const SizedBox(height: 16),
                   GestureDetector(
                     onTap: () => context.push('/history/receipt'),
-                    child: const _ReceiptCard(),
+                    child: RepaintBoundary(
+                      key: _receiptCardKey,
+                      child: const _ReceiptCard(),
+                    ),
                   ),
                   const SizedBox(height: 30),
                   Row(

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' as fm;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,7 +6,6 @@ import 'package:latlong2/latlong.dart' as ll;
 import '../../../core/di/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../viewmodels/map_search_state.dart';
-import '../views/kakao_map_widget.dart';
 
 const _regionCenters = {
   'NONSAN': ll.LatLng(36.1119731, 127.1083526),
@@ -24,15 +22,14 @@ class MapScreen extends ConsumerStatefulWidget {
 
 class _MapScreenState extends ConsumerState<MapScreen> {
   final _mapController = fm.MapController();
-  Object? _kakaoController;
   bool _locating = false;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(
-      () => ref.read(mapSearchViewModelProvider.notifier).searchNearby(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _moveToCurrentLocation();
+    });
   }
 
   Future<void> _search() =>
@@ -41,11 +38,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _moveToRegion(String region) {
     final center = _regionCenters[region]!;
     ref.read(mapSearchViewModelProvider.notifier).setRegion(region);
-    if (kIsWeb) {
-      _mapController.move(center, 12);
-    } else {
-      moveKakaoMap(_kakaoController, center.latitude, center.longitude);
-    }
+    _mapController.move(center, 12);
     _search();
   }
 
@@ -58,17 +51,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ref
           .read(mapSearchViewModelProvider.notifier)
           .applyDeviceLocation(position.lat, position.lng);
-      if (kIsWeb) {
-        _mapController.move(ll.LatLng(position.lat, position.lng), 14);
-      } else {
-        moveKakaoMap(_kakaoController, position.lat, position.lng);
-      }
+      await _search();
+      if (!mounted) return;
+      _mapController.move(ll.LatLng(position.lat, position.lng), 14);
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('현재 위치 주변을 보여드릴게요.')));
       }
     } catch (_) {
+      await _search();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('위치 권한을 허용하면 내 주변 장소를 찾을 수 있어요.')),
@@ -90,60 +82,49 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: kIsWeb
-                ? fm.FlutterMap(
-                    mapController: _mapController,
-                    options: const fm.MapOptions(
-                      initialCenter: ll.LatLng(36.4465, 127.1191),
-                      initialZoom: 12,
-                    ),
-                    children: [
-                      fm.TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.skutechtour.routemaker',
-                      ),
-                      if (points.length > 1)
-                        fm.PolylineLayer(
-                          polylines: [
-                            fm.Polyline(
-                              points: points,
-                              color: AppTheme.primary,
-                              strokeWidth: 5,
-                            ),
-                          ],
-                        ),
-                      fm.MarkerLayer(
-                        markers: [
-                          ...state.places.asMap().entries.map((entry) {
-                            final place = entry.value;
-                            return fm.Marker(
-                              point: ll.LatLng(place.lat, place.lng),
-                              width: 46,
-                              height: 46,
-                              child: _PlaceMarker(number: entry.key + 1),
-                            );
-                          }),
-                          if (state.currentLat != null &&
-                              state.currentLng != null)
-                            fm.Marker(
-                              point: ll.LatLng(
-                                state.currentLat!,
-                                state.currentLng!,
-                              ),
-                              width: 24,
-                              height: 24,
-                              child: const _CurrentLocationMarker(),
-                            ),
-                        ],
+            child: fm.FlutterMap(
+              mapController: _mapController,
+              options: const fm.MapOptions(
+                initialCenter: ll.LatLng(36.4465, 127.1191),
+                initialZoom: 12,
+              ),
+              children: [
+                fm.TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.techtour.flutterprojects',
+                ),
+                if (points.length > 1)
+                  fm.PolylineLayer(
+                    polylines: [
+                      fm.Polyline(
+                        points: points,
+                        color: AppTheme.primary,
+                        strokeWidth: 5,
                       ),
                     ],
-                  )
-                : buildKakaoMap(
-                    state: state,
-                    onCreated: (controller) =>
-                        setState(() => _kakaoController = controller),
                   ),
+                fm.MarkerLayer(
+                  markers: [
+                    ...state.places.asMap().entries.map((entry) {
+                      final place = entry.value;
+                      return fm.Marker(
+                        point: ll.LatLng(place.lat, place.lng),
+                        width: 46,
+                        height: 46,
+                        child: _PlaceMarker(number: entry.key + 1),
+                      );
+                    }),
+                    if (state.currentLat != null && state.currentLng != null)
+                      fm.Marker(
+                        point: ll.LatLng(state.currentLat!, state.currentLng!),
+                        width: 24,
+                        height: 24,
+                        child: const _CurrentLocationMarker(),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
           SafeArea(
             child: Column(

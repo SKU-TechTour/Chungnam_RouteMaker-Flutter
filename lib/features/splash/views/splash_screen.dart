@@ -31,7 +31,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigate() async {
-    await Future<void>.delayed(const Duration(seconds: 2));
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
     final preferences = await SharedPreferences.getInstance();
     if (!mounted) return;
@@ -95,9 +95,10 @@ class _SplashScreenState extends State<SplashScreen>
                   const Text(
                     '충남 루트메이커',
                     style: TextStyle(
+                      fontFamily: AppTheme.gowunDodum,
                       color: Colors.white,
                       fontSize: 28,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w400,
                       letterSpacing: -1,
                     ),
                   ),

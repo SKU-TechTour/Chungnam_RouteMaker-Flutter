@@ -215,8 +215,8 @@ class _PartyCard extends StatelessWidget {
           children: [
             Icon(
               party == TravelParty.enlistingSoldier
-                  ? Icons.person_rounded
-                  : Icons.groups_rounded,
+                  ? Icons.groups_rounded
+                  : Icons.luggage_rounded,
               color: selected ? AppTheme.primary : AppTheme.textSecondary,
             ),
             const SizedBox(width: 14),

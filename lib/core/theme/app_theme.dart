@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 abstract final class AppTheme {
+  static const pretendard = 'Pretendard';
+  static const gowunDodum = 'GowunDodum';
+  static const notoSansKr = 'NotoSansKR';
   static const primary = Color(0xFF123C3B);
   static const accent = Color(0xFF0E9F8B);
   static const coral = Color(0xFFFF7656);
@@ -23,7 +26,8 @@ abstract final class AppTheme {
       ),
       useMaterial3: true,
       scaffoldBackgroundColor: background,
-      fontFamily: 'Pretendard',
+      fontFamily: pretendard,
+      fontFamilyFallback: const [notoSansKr],
       dividerColor: divider,
       appBarTheme: const AppBarTheme(
         backgroundColor: background,
@@ -49,4 +53,9 @@ abstract final class AppTheme {
       ),
     );
   }
+
+  static const displayStyle = TextStyle(
+    fontFamily: gowunDodum,
+    fontWeight: FontWeight.w400,
+  );
 }

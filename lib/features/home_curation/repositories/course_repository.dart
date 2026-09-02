@@ -30,25 +30,45 @@ class CourseRepository {
     int variant = 0,
   }) async {
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        ApiConstants.courseRecommend,
-        data: {
-          'region': region,
-          'military': military,
-          'concepts': concepts.toList(),
-          'variant': variant,
-        },
+      final responses = await Future.wait(
+        List.generate(
+          3,
+          (index) => _fetchCourse(
+            region: region,
+            military: military,
+            concepts: concepts,
+            variant: variant + index,
+          ),
+        ),
       );
-      final data = response.data?['data'];
-      if (data is! Map<String, dynamic>) {
-        throw const ApiException(message: 'Invalid course response');
-      }
-      return [Course.fromJson(data)];
+      return responses;
     } on DioException catch (e) {
       final error = e.error;
       if (error is ApiException) throw error;
       throw ApiException(message: e.message ?? 'Failed to fetch courses');
     }
+  }
+
+  Future<Course> _fetchCourse({
+    required String region,
+    required bool military,
+    required Set<String> concepts,
+    required int variant,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      ApiConstants.courseRecommend,
+      data: {
+        'region': region,
+        'military': military,
+        'concepts': concepts.toList(),
+        'variant': variant,
+      },
+    );
+    final data = response.data?['data'];
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException(message: 'Invalid course response');
+    }
+    return Course.fromJson(data);
   }
 
   Future<Course> shufflePlanB(String courseId) async {
@@ -65,6 +85,20 @@ class CourseRepository {
       final error = e.error;
       if (error is ApiException) throw error;
       throw ApiException(message: e.message ?? 'Failed to shuffle course');
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchSpotDetails(String contentId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/api/external/tour/common-info',
+        queryParameters: {'contentId': contentId},
+      );
+      return response.data?['data'] as Map<String, dynamic>?;
+    } on DioException catch (e) {
+      final error = e.error;
+      if (error is ApiException) throw error;
+      throw ApiException(message: e.message ?? 'Failed to fetch place details');
     }
   }
 }

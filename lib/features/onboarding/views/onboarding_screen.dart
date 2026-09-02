@@ -201,10 +201,11 @@ class _OnboardingPage extends StatelessWidget {
             Text(
               item.title,
               style: const TextStyle(
+                fontFamily: AppTheme.gowunDodum,
                 fontSize: 30,
                 height: 1.22,
                 letterSpacing: -1.1,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w400,
               ),
             ),
             const SizedBox(height: 16),

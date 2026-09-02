@@ -61,8 +61,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         .read(homeCurationViewModelProvider.notifier)
         .loadCourses(
           region: _combo.code,
-          military: _combo.code == 'NONSAN' &&
-              _party == TravelParty.enlistingSoldier,
+          military:
+              _combo.code == 'NONSAN' && _party == TravelParty.enlistingSoldier,
           concepts: _concepts.map((concept) => concept.name).toSet(),
         );
   }
@@ -77,12 +77,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _loadRegion();
   }
 
+  void _showSpotDetails({
+    required String name,
+    required String category,
+    CourseSpot? spot,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _SpotDetailSheet(
+        name: name,
+        category: category,
+        spot: spot,
+        details: spot != null && spot.source == 'TOUR_API_REALTIME'
+            ? ref.read(courseRepositoryProvider).fetchSpotDetails(spot.id)
+            : Future.value(null),
+      ),
+    );
+  }
+
   SavedCourse _selectedCourse(Course? liveCourse) => SavedCourse(
-    id: liveCourse?.id ??
-        '${_combo.code}-$_sightIndex-$_foodIndex-$_cafeIndex',
+    id: liveCourse?.id ?? '${_combo.code}-$_sightIndex-$_foodIndex-$_cafeIndex',
     region: _combo.name,
     title: liveCourse?.title ?? '${_combo.name} 취향 맞춤 3단 콤보',
-    places: liveCourse?.spots.map((spot) => spot.name).toList() ??
+    places:
+        liveCourse?.spots.map((spot) => spot.name).toList() ??
         [
           if (_combo.code == 'NONSAN') '육군훈련소',
           _combo.sights[_sightIndex],
@@ -96,21 +116,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final curationState = ref.watch(homeCurationViewModelProvider);
     final loading = curationState.isLoading;
     final liveCourse = curationState.currentCourse;
-    final sightOptions = liveCourse != null && liveCourse.spots.isNotEmpty
-        ? [liveCourse.spots[0].name]
+    final sightSpots = curationState.courses
+        .where((course) => course.spots.isNotEmpty)
+        .map((course) => course.spots[0])
+        .toList();
+    final foodSpots = curationState.courses
+        .where((course) => course.spots.length > 1)
+        .map((course) => course.spots[1])
+        .toList();
+    final cafeSpots = curationState.courses
+        .where((course) => course.spots.length > 2)
+        .map((course) => course.spots[2])
+        .toList();
+    final sightOptions = sightSpots.isNotEmpty
+        ? sightSpots.map((spot) => spot.name).toList()
         : ApiConstants.useMockData
-            ? _combo.sights
-            : const ['실시간 관광정보를 불러오는 중'];
-    final foodOptions = liveCourse != null && liveCourse.spots.length > 1
-        ? [liveCourse.spots[1].name]
+        ? _combo.sights
+        : const ['실시간 관광정보를 불러오는 중'];
+    final foodOptions = foodSpots.isNotEmpty
+        ? foodSpots.map((spot) => spot.name).toList()
         : ApiConstants.useMockData
-            ? _combo.foods
-            : const ['실시간 맛집 정보를 불러오는 중'];
-    final cafeOptions = liveCourse != null && liveCourse.spots.length > 2
-        ? [liveCourse.spots[2].name]
+        ? _combo.foods
+        : const ['실시간 맛집 정보를 불러오는 중'];
+    final cafeOptions = cafeSpots.isNotEmpty
+        ? cafeSpots.map((spot) => spot.name).toList()
         : ApiConstants.useMockData
-            ? _combo.cafes
-            : const ['실시간 카페 정보를 불러오는 중'];
+        ? _combo.cafes
+        : const ['실시간 카페 정보를 불러오는 중'];
     final saved = ref.watch(savedCoursesProvider);
     final selectedCourse = _selectedCourse(liveCourse);
     final isSaved = saved.any((course) => course.id == selectedCourse.id);
@@ -146,35 +178,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const Text(
                     '오늘은 충남 어디로\n떠나볼까요?',
                     style: TextStyle(
+                      fontFamily: AppTheme.gowunDodum,
                       color: AppTheme.textPrimary,
-                      fontSize: 30,
+                      fontSize: 16,
                       height: 1.2,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -1.2,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: -0.3,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.wb_sunny_outlined,
-                        color: AppTheme.warning,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        liveCourse == null
-                            ? '${_combo.name} · 날씨와 관광정보를 확인하고 있어요'
-                            : liveCourse.weatherTag == 'RAINY'
-                                ? '${_combo.name} · 비 예보를 반영한 실내 코스예요'
-                                : '${_combo.name} · 현재 예보를 반영한 코스예요',
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 12),
+                  _HourlyWeatherCard(
+                    region: _combo.name,
+                    course: liveCourse,
+                    loading: loading,
                   ),
                   const SizedBox(height: 26),
                   _RegionSelector(
@@ -264,8 +280,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     icon: Icons.landscape_rounded,
                     color: AppTheme.accent,
                     options: sightOptions,
-                    selectedIndex: liveCourse != null ? 0 : _sightIndex,
+                    selectedIndex: _sightIndex.clamp(
+                      0,
+                      sightOptions.length - 1,
+                    ),
                     onChanged: (value) => setState(() => _sightIndex = value),
+                    onInfo: () => _showSpotDetails(
+                      name:
+                          sightOptions[_sightIndex.clamp(
+                            0,
+                            sightOptions.length - 1,
+                          )],
+                      category: '볼거리',
+                      spot: sightSpots.isEmpty
+                          ? null
+                          : sightSpots[_sightIndex.clamp(
+                              0,
+                              sightSpots.length - 1,
+                            )],
+                    ),
                   ),
                   const _RouteConnector(),
                   _ComboStep(
@@ -274,8 +307,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     icon: Icons.restaurant_rounded,
                     color: AppTheme.coral,
                     options: foodOptions,
-                    selectedIndex: liveCourse != null ? 0 : _foodIndex,
+                    selectedIndex: _foodIndex.clamp(0, foodOptions.length - 1),
                     onChanged: (value) => setState(() => _foodIndex = value),
+                    onInfo: () => _showSpotDetails(
+                      name:
+                          foodOptions[_foodIndex.clamp(
+                            0,
+                            foodOptions.length - 1,
+                          )],
+                      category: '먹거리',
+                      spot: foodSpots.isEmpty
+                          ? null
+                          : foodSpots[_foodIndex.clamp(
+                              0,
+                              foodSpots.length - 1,
+                            )],
+                    ),
                   ),
                   const _RouteConnector(),
                   _ComboStep(
@@ -284,8 +331,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     icon: Icons.local_cafe_rounded,
                     color: const Color(0xFF6B68D9),
                     options: cafeOptions,
-                    selectedIndex: liveCourse != null ? 0 : _cafeIndex,
+                    selectedIndex: _cafeIndex.clamp(0, cafeOptions.length - 1),
                     onChanged: (value) => setState(() => _cafeIndex = value),
+                    onInfo: () => _showSpotDetails(
+                      name:
+                          cafeOptions[_cafeIndex.clamp(
+                            0,
+                            cafeOptions.length - 1,
+                          )],
+                      category: '쉴거리',
+                      spot: cafeSpots.isEmpty
+                          ? null
+                          : cafeSpots[_cafeIndex.clamp(
+                              0,
+                              cafeSpots.length - 1,
+                            )],
+                    ),
                   ),
                   const SizedBox(height: 18),
                   Container(
@@ -327,14 +388,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           children: [
                             Expanded(
                               child: OutlinedButton.icon(
-                                onPressed: liveCourse != null ||
+                                onPressed:
+                                    liveCourse != null ||
                                         ApiConstants.useMockData
                                     ? () {
                                         ref
                                             .read(savedCoursesProvider.notifier)
                                             .toggle(selectedCourse);
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           SnackBar(
                                             content: Text(
                                               isSaved
@@ -352,6 +415,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 ),
                                 label: Text(isSaved ? '저장됨' : '찜하기'),
                                 style: OutlinedButton.styleFrom(
+                                  textStyle: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
                                   foregroundColor: Colors.white,
                                   side: BorderSide(
                                     color: Colors.white.withValues(alpha: 0.35),
@@ -367,7 +437,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             Expanded(
                               flex: 2,
                               child: FilledButton.icon(
-                                onPressed: liveCourse != null ||
+                                onPressed:
+                                    liveCourse != null ||
                                         ApiConstants.useMockData
                                     ? () => context.go('/map')
                                     : _loadRegion,
@@ -544,6 +615,7 @@ class _ComboStep extends StatelessWidget {
     required this.options,
     required this.selectedIndex,
     required this.onChanged,
+    required this.onInfo,
   });
   final int number;
   final String label;
@@ -552,6 +624,7 @@ class _ComboStep extends StatelessWidget {
   final List<String> options;
   final int selectedIndex;
   final ValueChanged<int> onChanged;
+  final VoidCallback onInfo;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -610,8 +683,295 @@ class _ComboStep extends StatelessWidget {
                   },
                 ),
               ),
+              const SizedBox(height: 5),
+              InkWell(
+                onTap: onInfo,
+                borderRadius: BorderRadius.circular(8),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'TourAPI 소개 보기',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(width: 3),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _HourlyWeatherCard extends StatelessWidget {
+  const _HourlyWeatherCard({
+    required this.region,
+    required this.course,
+    required this.loading,
+  });
+
+  final String region;
+  final Course? course;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final forecasts = course?.hourlyWeather.take(4).toList() ?? const [];
+    final rainy = course?.weatherTag == 'RAINY';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppTheme.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                rainy ? Icons.umbrella_rounded : Icons.wb_sunny_rounded,
+                color: rainy ? const Color(0xFF5B7CFA) : AppTheme.warning,
+                size: 19,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$region 시간대별 날씨',
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+              const Spacer(),
+              const Text(
+                '기상청 실시간',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 10),
+              ),
+            ],
+          ),
+          const SizedBox(height: 13),
+          if (loading)
+            const LinearProgressIndicator(minHeight: 3)
+          else if (forecasts.isEmpty)
+            Text(
+              course == null
+                  ? '서버에서 예보를 불러오고 있어요.'
+                  : rainy
+                  ? '강수 예보가 있어 실내 코스를 우선 추천해요.'
+                  : '현재 강수 예정은 없어요.',
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 12,
+              ),
+            )
+          else
+            Row(
+              children: forecasts
+                  .map(
+                    (forecast) => Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            forecast.time,
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 10,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Icon(
+                            forecast.precipitationExpected
+                                ? Icons.water_drop_rounded
+                                : Icons.wb_sunny_outlined,
+                            size: 18,
+                            color: forecast.precipitationExpected
+                                ? const Color(0xFF5B7CFA)
+                                : AppTheme.warning,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${forecast.temperature}°',
+                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                          Text(
+                            '강수 ${forecast.precipitationProbability}%',
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SpotDetailSheet extends StatelessWidget {
+  const _SpotDetailSheet({
+    required this.name,
+    required this.category,
+    required this.spot,
+    required this.details,
+  });
+
+  final String name;
+  final String category;
+  final CourseSpot? spot;
+  final Future<Map<String, dynamic>?> details;
+
+  String _plainText(String value) => value
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .trim();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: EdgeInsets.fromLTRB(
+      22,
+      12,
+      22,
+      24 + MediaQuery.paddingOf(context).bottom,
+    ),
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(
+          child: Container(
+            width: 42,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppTheme.divider,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        if (spot?.imageUrl case final imageUrl?)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Image.network(
+              imageUrl,
+              width: double.infinity,
+              height: 180,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            ),
+          ),
+        if (spot?.imageUrl != null) const SizedBox(height: 18),
+        Text(
+          category,
+          style: const TextStyle(
+            color: AppTheme.accent,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          name,
+          style: const TextStyle(fontFamily: AppTheme.gowunDodum, fontSize: 25),
+        ),
+        const SizedBox(height: 12),
+        FutureBuilder<Map<String, dynamic>?>(
+          future: details,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: LinearProgressIndicator(minHeight: 3),
+              );
+            }
+            final detail = snapshot.data;
+            final overview = _plainText(detail?['overview'] as String? ?? '');
+            final address = detail?['address'] as String? ?? spot?.address;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  overview.isNotEmpty
+                      ? overview
+                      : '한국관광공사 TourAPI에서 제공한 장소입니다.',
+                  maxLines: 8,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    height: 1.55,
+                  ),
+                ),
+                if (address?.isNotEmpty == true) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.place_outlined,
+                        size: 17,
+                        color: AppTheme.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          address!,
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            const Icon(
+              Icons.cloud_done_outlined,
+              size: 17,
+              color: AppTheme.primary,
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                spot?.source ?? 'TOUR_API_REALTIME',
+                style: const TextStyle(
+                  color: AppTheme.primary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     ),
@@ -756,8 +1116,8 @@ class _NonsanEntryCard extends StatelessWidget {
                   label: Text(value.label),
                   icon: Icon(
                     value == TravelParty.enlistingSoldier
-                        ? Icons.person_rounded
-                        : Icons.groups_rounded,
+                        ? Icons.groups_rounded
+                        : Icons.luggage_rounded,
                   ),
                 ),
               )
