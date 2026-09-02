@@ -15,57 +15,6 @@
 | `refactor` | 구조 개선(Refactor) | **기능은 동일**, 코드 정리·분리·이름 변경 |
 | `style` | 포맷·린트 | 세미콜론, import 정리 등 **로직 변경 없음** |
 
-#### feat — 새 기능
-
-```
-
-## 데이터 실행 모드
-
-공모전 제출 앱은 기본값으로 Spring을 통해 한국관광공사 OpenAPI를 실시간 호출합니다.
-API 오류가 발생해도 Mock 관광데이터로 자동 대체하지 않습니다.
-
-```powershell
-# 1번 터미널: Spring 백엔드(로컬 H2 DB) 실행
-cd C:\Users\USER\IdeaProjects\routemaker_backend
-.\gradlew.bat bootRun --args="--spring.profiles.active=local"
-
-# 2번 터미널: 기본/제출 모드(실시간 OpenAPI) 실행
-cd C:\Users\USER\flutterprojects
-flutter run -d chrome
-
-# UI 개발 및 자동 테스트에서만 사용하는 명시적 Mock 모드
-flutter run -d chrome --dart-define=USE_MOCK_DATA=true
-```
-
-`assets/mock`은 퍼블리싱 및 테스트 전용이며 제출 빌드의 관광정보 출처로 사용하지 않습니다.
-실시간 모드는 `http://localhost:8080` 백엔드가 먼저 실행 중이어야 합니다.
-feat: 맞춤형 3단 코스 추천 API 추가
-```
-
-#### fix — 버그 수정
-
-```
-fix: JWT 만료 시 401 대신 500이 반환되던 문제 수정
-```
-
-#### chore — 설정 변경
-
-```
-chore: Cloudtype 배포 환경 변수 정리
-```
-
-#### docs — 문서
-
-```
-docs: Spring 아키텍처 및 Flutter 연동 가이드 README 추가
-```
-
-#### refactor — 구조 개선 (기능 동일)
-
-```
-refactor: PlaceService 필터 로직을 PlaceFilterService로 분리
-```
-
 ---
 ## 1. 아키텍처 개요
 
