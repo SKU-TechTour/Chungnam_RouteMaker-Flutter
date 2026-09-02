@@ -39,6 +39,19 @@ flutter run -d chrome --dart-define=USE_MOCK_DATA=true
 
 `assets/mock`은 퍼블리싱 및 테스트 전용이며 제출 빌드의 관광정보 출처로 사용하지 않습니다.
 실시간 모드는 `http://localhost:8080` 백엔드가 먼저 실행 중이어야 합니다.
+
+## Android release 서명
+
+Google Play 업로드 키는 Git에 저장하지 않고 다음 Windows 사용자 환경변수로 주입합니다.
+
+```text
+ROUTEMAKER_UPLOAD_STORE_FILE
+ROUTEMAKER_UPLOAD_STORE_PASSWORD
+ROUTEMAKER_UPLOAD_KEY_ALIAS
+ROUTEMAKER_UPLOAD_KEY_PASSWORD
+```
+
+서명 설정을 변경한 후에는 Android Studio를 완전히 재시작합니다. 업로드 키 파일과 비밀번호를 잃어버리지 않도록 별도로 백업합니다.
 feat: 맞춤형 3단 코스 추천 API 추가
 ```
 
