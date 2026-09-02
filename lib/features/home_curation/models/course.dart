@@ -11,6 +11,8 @@ class Course {
     this.totalDurationSeconds = 0,
     this.source,
     this.hourlyWeather = const [],
+    this.recommendedStartTime,
+    this.targetArrivalTime,
   });
 
   factory Course.fromJson(Map<String, dynamic> json) {
@@ -31,6 +33,8 @@ class Course {
           .whereType<Map<String, dynamic>>()
           .map(HourlyWeather.fromJson)
           .toList(),
+      recommendedStartTime: json['recommendedStartTime'] as String?,
+      targetArrivalTime: json['targetArrivalTime'] as String?,
     );
   }
 
@@ -42,6 +46,8 @@ class Course {
   final int totalDurationSeconds;
   final String? source;
   final List<HourlyWeather> hourlyWeather;
+  final String? recommendedStartTime;
+  final String? targetArrivalTime;
 
   String get formattedDuration {
     if (totalDurationSeconds <= 0) return '시간 계산 중';
@@ -84,6 +90,7 @@ class CourseSpot {
     this.imageUrl,
     this.source,
     this.address,
+    this.scheduledTime,
   });
 
   factory CourseSpot.fromJson(Map<String, dynamic> json) => CourseSpot(
@@ -95,6 +102,7 @@ class CourseSpot {
     imageUrl: json['imageUrl'] as String?,
     source: json['source'] as String?,
     address: json['address'] as String?,
+    scheduledTime: json['scheduledTime'] as String?,
   );
 
   final String id;
@@ -105,4 +113,5 @@ class CourseSpot {
   final String? imageUrl;
   final String? source;
   final String? address;
+  final String? scheduledTime;
 }

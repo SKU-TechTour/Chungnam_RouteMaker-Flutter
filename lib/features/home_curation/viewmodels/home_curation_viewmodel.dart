@@ -15,13 +15,19 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
   Future<void> loadCourses({
     String region = 'GONGJU',
     bool military = false,
+    String? journeyType,
+    String? routeTemplate,
     Set<String> concepts = const {},
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     final repository = ref.read(courseRepositoryProvider);
     if (ApiConstants.useMockData) {
       final courses = await repository.loadMockCourses(region: region);
-      state = state.copyWith(courses: courses, isLoading: false);
+      state = state.copyWith(
+        courses: courses,
+        currentIndex: 0,
+        isLoading: false,
+      );
       return;
     }
     // 운영 모드에서는 반드시 Spring을 거쳐 실시간 API 경로를 사용합니다.
@@ -29,9 +35,15 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
       final courses = await repository.fetchCourses(
         region: region,
         military: military,
+        journeyType: journeyType,
+        routeTemplate: routeTemplate,
         concepts: concepts,
       );
-      state = state.copyWith(courses: courses, isLoading: false);
+      state = state.copyWith(
+        courses: courses,
+        currentIndex: 0,
+        isLoading: false,
+      );
     } catch (error) {
       state = state.copyWith(
         isLoading: false,

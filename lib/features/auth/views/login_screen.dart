@@ -56,12 +56,12 @@ class LoginScreen extends ConsumerWidget {
                     child: Text(
                       '이번 주말,\n어디로 걸어볼까요?',
                       style: TextStyle(
-                        fontFamily: AppTheme.notoSansKr,
+                        fontFamily: AppTheme.gowunDodum,
                         color: Colors.white,
                         fontSize: 32,
                         height: 1.22,
                         letterSpacing: -1.3,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ),

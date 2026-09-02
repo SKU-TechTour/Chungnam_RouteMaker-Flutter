@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
-import 'package:flutterprojects/core/constants/api_constants.dart';
 import 'package:flutterprojects/core/network/api_exception.dart';
 import 'package:flutterprojects/features/home_curation/models/course.dart';
+import 'package:flutterprojects/features/home_curation/models/selected_route.dart';
 
 /// [SB 화면 1] 코스 큐레이션 API 호출.
 ///
@@ -26,49 +26,35 @@ class CourseRepository {
   Future<List<Course>> fetchCourses({
     required String region,
     bool military = false,
+    String? journeyType,
+    String? routeTemplate,
     Set<String> concepts = const {},
     int variant = 0,
   }) async {
     try {
-      final responses = await Future.wait(
-        List.generate(
-          3,
-          (index) => _fetchCourse(
-            region: region,
-            military: military,
-            concepts: concepts,
-            variant: variant + index,
-          ),
-        ),
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/api/courses/recommendations',
+        data: {
+          'region': region,
+          'military': military,
+          'journeyType': journeyType,
+          'routeTemplate': routeTemplate,
+          'concepts': concepts.toList(),
+          'variant': variant,
+        },
       );
-      return responses;
+      final data = response.data?['data'] as List<dynamic>?;
+      if (data == null) {
+        throw const ApiException(message: 'Invalid course list response');
+      }
+      return data
+          .map((item) => Course.fromJson(item as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       final error = e.error;
       if (error is ApiException) throw error;
       throw ApiException(message: e.message ?? 'Failed to fetch courses');
     }
-  }
-
-  Future<Course> _fetchCourse({
-    required String region,
-    required bool military,
-    required Set<String> concepts,
-    required int variant,
-  }) async {
-    final response = await _dio.post<Map<String, dynamic>>(
-      ApiConstants.courseRecommend,
-      data: {
-        'region': region,
-        'military': military,
-        'concepts': concepts.toList(),
-        'variant': variant,
-      },
-    );
-    final data = response.data?['data'];
-    if (data is! Map<String, dynamic>) {
-      throw const ApiException(message: 'Invalid course response');
-    }
-    return Course.fromJson(data);
   }
 
   Future<Course> shufflePlanB(String courseId) async {
@@ -99,6 +85,37 @@ class CourseRepository {
       final error = e.error;
       if (error is ApiException) throw error;
       throw ApiException(message: e.message ?? 'Failed to fetch place details');
+    }
+  }
+
+  Future<RouteMetrics> previewRoute(List<CourseSpot> spots) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/api/courses/route-preview',
+        data: {
+          'spots': spots
+              .map(
+                (spot) => {
+                  'id': int.tryParse(spot.id) ?? -1,
+                  'latitude': spot.latitude,
+                  'longitude': spot.longitude,
+                },
+              )
+              .toList(),
+        },
+      );
+      final data = response.data?['data'] as Map<String, dynamic>?;
+      if (data == null) {
+        throw const ApiException(message: 'Invalid route preview response');
+      }
+      return RouteMetrics(
+        distanceMeters: (data['totalDistanceMeters'] as num?)?.round() ?? 0,
+        durationSeconds: (data['totalDurationSeconds'] as num?)?.round() ?? 0,
+      );
+    } on DioException catch (e) {
+      final error = e.error;
+      if (error is ApiException) throw error;
+      throw ApiException(message: e.message ?? 'Failed to preview route');
     }
   }
 }

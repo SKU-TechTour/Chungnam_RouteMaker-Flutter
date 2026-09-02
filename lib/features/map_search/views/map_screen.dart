@@ -5,7 +5,7 @@ import 'package:latlong2/latlong.dart' as ll;
 
 import '../../../core/di/providers.dart';
 import '../../../core/theme/app_theme.dart';
-import '../viewmodels/map_search_state.dart';
+import '../models/place.dart';
 
 const _regionCenters = {
   'NONSAN': ll.LatLng(36.1119731, 127.1083526),
@@ -28,7 +28,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _moveToCurrentLocation();
+      final selected = ref.read(selectedRouteProvider);
+      _moveToCurrentLocation(searchNearby: selected == null);
+      if (selected != null && selected.spots.length > 1) {
+        _mapController.fitCamera(
+          fm.CameraFit.bounds(
+            bounds: fm.LatLngBounds.fromPoints(
+              selected.spots
+                  .map((spot) => ll.LatLng(spot.latitude, spot.longitude))
+                  .toList(),
+            ),
+            padding: const EdgeInsets.fromLTRB(48, 170, 48, 230),
+          ),
+        );
+      }
     });
   }
 
@@ -42,7 +55,94 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _search();
   }
 
-  Future<void> _moveToCurrentLocation() async {
+  void _showPlace(BuildContext context, Place place) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          22 + MediaQuery.paddingOf(context).bottom,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.divider,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (place.imageUrl?.isNotEmpty == true)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Image.network(
+                  place.imageUrl!,
+                  width: double.infinity,
+                  height: 170,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              ),
+            if (place.imageUrl?.isNotEmpty == true) const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    place.name,
+                    style: const TextStyle(
+                      fontFamily: AppTheme.gowunDodum,
+                      fontSize: 23,
+                    ),
+                  ),
+                ),
+                if (place.scheduledTime case final time?)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.softCoral,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      time,
+                      style: const TextStyle(
+                        color: AppTheme.coral,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            if (place.address?.isNotEmpty == true) ...[
+              const SizedBox(height: 8),
+              Text(
+                place.address!,
+                style: const TextStyle(color: AppTheme.textSecondary),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _moveToCurrentLocation({bool searchNearby = true}) async {
     setState(() => _locating = true);
     try {
       final position = await ref
@@ -51,16 +151,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ref
           .read(mapSearchViewModelProvider.notifier)
           .applyDeviceLocation(position.lat, position.lng);
-      await _search();
+      if (searchNearby) await _search();
       if (!mounted) return;
-      _mapController.move(ll.LatLng(position.lat, position.lng), 14);
+      if (searchNearby) {
+        _mapController.move(ll.LatLng(position.lat, position.lng), 14);
+      }
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('현재 위치 주변을 보여드릴게요.')));
       }
     } catch (_) {
-      await _search();
+      if (searchNearby) await _search();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('위치 권한을 허용하면 내 주변 장소를 찾을 수 있어요.')),
@@ -74,7 +176,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(mapSearchViewModelProvider);
-    final points = state.places
+    final selectedRoute = ref.watch(selectedRouteProvider);
+    final places = selectedRoute == null
+        ? state.places
+        : selectedRoute.spots.map(Place.fromCourseSpot).toList();
+    final points = places
         .map((place) => ll.LatLng(place.lat, place.lng))
         .toList();
 
@@ -84,8 +190,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           Positioned.fill(
             child: fm.FlutterMap(
               mapController: _mapController,
-              options: const fm.MapOptions(
-                initialCenter: ll.LatLng(36.4465, 127.1191),
+              options: fm.MapOptions(
+                initialCenter: points.isNotEmpty
+                    ? points.first
+                    : const ll.LatLng(36.4465, 127.1191),
                 initialZoom: 12,
               ),
               children: [
@@ -105,13 +213,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   ),
                 fm.MarkerLayer(
                   markers: [
-                    ...state.places.asMap().entries.map((entry) {
+                    ...places.asMap().entries.map((entry) {
                       final place = entry.value;
                       return fm.Marker(
                         point: ll.LatLng(place.lat, place.lng),
                         width: 46,
                         height: 46,
-                        child: _PlaceMarker(number: entry.key + 1),
+                        child: GestureDetector(
+                          onTap: () => _showPlace(context, place),
+                          child: _PlaceMarker(number: entry.key + 1),
+                        ),
                       );
                     }),
                     if (state.currentLat != null && state.currentLng != null)
@@ -151,19 +262,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           color: AppTheme.primary,
                         ),
                         const SizedBox(width: 11),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '내 주변 콤보',
+                                selectedRoute?.title ?? '내 주변 콤보',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
                               Text(
-                                '현재 위치에서 가까운 여행지를 연결했어요',
+                                selectedRoute == null
+                                    ? '현재 위치에서 가까운 여행지를 연결했어요'
+                                    : '선택한 ${selectedRoute.spots.length}곳을 순서대로 연결했어요',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: AppTheme.textSecondary,
@@ -173,7 +286,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           ),
                         ),
                         IconButton(
-                          onPressed: _locating ? null : _moveToCurrentLocation,
+                          onPressed: _locating
+                              ? null
+                              : () => _moveToCurrentLocation(
+                                  searchNearby: selectedRoute == null,
+                                ),
                           tooltip: '현 위치로 이동',
                           icon: _locating
                               ? const SizedBox(
@@ -189,85 +306,77 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 42,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: [
-                      _RegionChip(
-                        label: '논산',
-                        value: 'NONSAN',
-                        selected: state.region,
-                        onTap: _moveToRegion,
-                      ),
-                      _RegionChip(
-                        label: '공주',
-                        value: 'GONGJU',
-                        selected: state.region,
-                        onTap: _moveToRegion,
-                      ),
-                      _RegionChip(
-                        label: '부여',
-                        value: 'BUYEO',
-                        selected: state.region,
-                        onTap: _moveToRegion,
-                      ),
-                    ],
+                if (selectedRoute == null) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 42,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        _RegionChip(
+                          label: '논산',
+                          value: 'NONSAN',
+                          selected: state.region,
+                          onTap: _moveToRegion,
+                        ),
+                        _RegionChip(
+                          label: '공주',
+                          value: 'GONGJU',
+                          selected: state.region,
+                          onTap: _moveToRegion,
+                        ),
+                        _RegionChip(
+                          label: '부여',
+                          value: 'BUYEO',
+                          selected: state.region,
+                          onTap: _moveToRegion,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 40,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: [
-                      _FilterChip(
-                        label: '유모차 가능',
-                        icon: Icons.baby_changing_station,
-                        selected: state.strollerAccessible,
-                        onTap: () {
-                          ref
-                              .read(mapSearchViewModelProvider.notifier)
-                              .toggleStrollerAccessible(
-                                !state.strollerAccessible,
-                              );
-                          _search();
-                        },
-                      ),
-                      _FilterChip(
-                        label: '반려동물',
-                        icon: Icons.pets_rounded,
-                        selected: state.petFriendly,
-                        onTap: () {
-                          ref
-                              .read(mapSearchViewModelProvider.notifier)
-                              .togglePetFriendly(!state.petFriendly);
-                          _search();
-                        },
-                      ),
-                      _FilterChip(
-                        label: '대형 주차장',
-                        icon: Icons.local_parking_rounded,
-                        selected: state.parking,
-                        onTap: () {
-                          ref
-                              .read(mapSearchViewModelProvider.notifier)
-                              .toggleParking(!state.parking);
-                          _search();
-                        },
-                      ),
-                    ],
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 40,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        _FilterChip(
+                          label: '반려동물',
+                          icon: Icons.pets_rounded,
+                          selected: state.petFriendly,
+                          onTap: () {
+                            ref
+                                .read(mapSearchViewModelProvider.notifier)
+                                .togglePetFriendly(!state.petFriendly);
+                            _search();
+                          },
+                        ),
+                        _FilterChip(
+                          label: '대형 주차장',
+                          icon: Icons.local_parking_rounded,
+                          selected: state.parking,
+                          onTap: () {
+                            ref
+                                .read(mapSearchViewModelProvider.notifier)
+                                .toggleParking(!state.parking);
+                            _search();
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
                 if (state.errorMessage case final message?) ...[
                   const SizedBox(height: 10),
                   _ApiErrorBanner(message: message, onRetry: _search),
                 ],
                 const Spacer(),
-                _RoutePreview(state: state),
+                _RoutePreview(
+                  places: places,
+                  isLoading: selectedRoute == null && state.isLoading,
+                ),
               ],
             ),
           ),
@@ -412,12 +521,12 @@ class _PlaceMarker extends StatelessWidget {
 }
 
 class _RoutePreview extends StatelessWidget {
-  const _RoutePreview({required this.state});
-  final MapSearchState state;
+  const _RoutePreview({required this.places, required this.isLoading});
+  final List<Place> places;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
-    final places = state.places;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       padding: const EdgeInsets.all(18),
@@ -442,7 +551,7 @@ class _RoutePreview extends StatelessWidget {
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
               ),
               const Spacer(),
-              if (state.isLoading)
+              if (isLoading)
                 const SizedBox(
                   width: 18,
                   height: 18,
@@ -468,65 +577,69 @@ class _RoutePreview extends StatelessWidget {
               ),
             )
           else
-            Row(
-              children: places.take(3).toList().asMap().entries.expand<Widget>((
-                entry,
-              ) {
-                final widgets = <Widget>[
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 30,
-                          height: 30,
-                          alignment: Alignment.center,
-                          decoration: const BoxDecoration(
-                            color: AppTheme.softMint,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            '${entry.key + 1}',
-                            style: const TextStyle(
-                              color: AppTheme.primary,
-                              fontWeight: FontWeight.w900,
+            SizedBox(
+              height: 68,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: places.asMap().entries.expand<Widget>((entry) {
+                  final widgets = <Widget>[
+                    SizedBox(
+                      width: 96,
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 30,
+                            height: 30,
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
+                              color: AppTheme.softMint,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '${entry.key + 1}',
+                              style: const TextStyle(
+                                color: AppTheme.primary,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          entry.value.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (entry.value.formattedDistance case final distance?)
+                          const SizedBox(height: 6),
                           Text(
-                            distance,
+                            entry.value.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
                             style: const TextStyle(
-                              color: AppTheme.accent,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                      ],
+                          if (entry.value.formattedDistance
+                              case final distance?)
+                            Text(
+                              distance,
+                              style: const TextStyle(
+                                color: AppTheme.accent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                ];
-                if (entry.key < places.take(3).length - 1) {
-                  widgets.add(
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppTheme.textSecondary,
-                      size: 18,
-                    ),
-                  );
-                }
-                return widgets;
-              }).toList(),
+                  ];
+                  if (entry.key < places.length - 1) {
+                    widgets.add(
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppTheme.textSecondary,
+                        size: 18,
+                      ),
+                    );
+                  }
+                  return widgets;
+                }).toList(),
+              ),
             ),
         ],
       ),

@@ -1,3 +1,5 @@
+import '../../home_curation/models/course.dart';
+
 /// 주변 관광지/식당/카페 모델.
 ///
 /// Spring `POST /api/places/filter` 요청·응답 필드와 매핑합니다.
@@ -14,6 +16,9 @@ class Place {
     this.strollerAccessible = false,
     this.largeParking = false,
     this.distanceMeters,
+    this.imageUrl,
+    this.address,
+    this.scheduledTime,
   });
 
   factory Place.fromJson(Map<String, dynamic> json) {
@@ -32,8 +37,26 @@ class Place {
       petFriendly: json['petFriendly'] as bool? ?? false,
       strollerAccessible: json['strollerAccessible'] as bool? ?? false,
       largeParking: json['largeParking'] as bool? ?? false,
+      imageUrl: json['imageUrl'] as String?,
+      address: json['address'] as String?,
     );
   }
+
+  factory Place.fromCourseSpot(CourseSpot spot) => Place(
+    id: spot.id,
+    name: spot.name,
+    type: switch (spot.category) {
+      'RESTAURANT' => PlaceType.restaurant,
+      'ACCOMMODATION' => PlaceType.accommodation,
+      'CAFE' => PlaceType.cafe,
+      _ => PlaceType.tourist,
+    },
+    lat: spot.latitude,
+    lng: spot.longitude,
+    imageUrl: spot.imageUrl,
+    address: spot.address,
+    scheduledTime: spot.scheduledTime,
+  );
 
   final String id;
   final String name;
@@ -44,6 +67,9 @@ class Place {
   final bool strollerAccessible;
   final bool largeParking;
   final double? distanceMeters;
+  final String? imageUrl;
+  final String? address;
+  final String? scheduledTime;
 
   Place withDistance(double value) => Place(
     id: id,
@@ -55,6 +81,9 @@ class Place {
     strollerAccessible: strollerAccessible,
     largeParking: largeParking,
     distanceMeters: value,
+    imageUrl: imageUrl,
+    address: address,
+    scheduledTime: scheduledTime,
   );
 
   String? get formattedDistance {

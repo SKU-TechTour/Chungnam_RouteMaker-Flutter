@@ -9,6 +9,7 @@ import '../../../core/widgets/route_maker_logo.dart';
 import '../../saved/models/saved_course.dart';
 import '../../saved/viewmodels/saved_courses_provider.dart';
 import '../models/course.dart';
+import '../models/selected_route.dart';
 import '../../travel_preferences/models/travel_preferences.dart';
 import '../../travel_preferences/repositories/travel_preferences_repository.dart';
 
@@ -21,11 +22,14 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   var _regionIndex = 0;
-  var _sightIndex = 0;
-  var _foodIndex = 0;
-  var _cafeIndex = 0;
-  var _party = TravelParty.companion;
+  var _party = TravelParty.traveler;
+  var _duration = TripDuration.dayTrip;
+  var _routeTemplate = RouteTemplate.travelerFlexible;
   Set<TravelConcept> _concepts = TravelConcept.values.toSet();
+  List<CourseSpot> _editableSpots = [];
+  var _selectedVariant = 0;
+  RouteMetrics? _previewMetrics;
+  bool _routeUpdating = false;
 
   final _preferencesRepository = TravelPreferencesRepository();
 
@@ -34,47 +38,130 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(_loadRegion);
     _loadPreferences();
   }
 
   Future<void> _loadPreferences() async {
     final preferences = await _preferencesRepository.load();
-    if (preferences == null || !mounted) return;
-    setState(() {
-      _party = preferences.party;
-      _concepts = preferences.concepts;
-    });
-    _loadRegion();
+    if (!mounted) return;
+    if (preferences != null) {
+      setState(() {
+        _party = preferences.party;
+        _duration = preferences.duration;
+        _routeTemplate = preferences.routeTemplate;
+        _concepts = preferences.concepts;
+      });
+    }
+    await _loadRegion();
   }
 
-  Future<void> _selectParty(TravelParty party) async {
-    setState(() => _party = party);
-    await _preferencesRepository.save(
-      TravelPreferences(party: party, concepts: _concepts),
-    );
-    _loadRegion();
-  }
-
-  void _loadRegion() {
-    ref
+  Future<void> _loadRegion() async {
+    final nonsanTemplate = _combo.code == 'NONSAN'
+        ? _routeTemplate
+        : RouteTemplate.travelerFlexible;
+    await ref
         .read(homeCurationViewModelProvider.notifier)
         .loadCourses(
           region: _combo.code,
-          military:
-              _combo.code == 'NONSAN' && _party == TravelParty.enlistingSoldier,
+          military: _combo.code == 'NONSAN' && _party != TravelParty.traveler,
+          journeyType: _party.name,
+          routeTemplate: nonsanTemplate.apiCode,
           concepts: _concepts.map((concept) => concept.name).toSet(),
         );
+    if (!mounted) return;
+    final courses = ref.read(homeCurationViewModelProvider).courses;
+    if (courses.isNotEmpty) _applyVariant(0, courses);
   }
 
   void _selectRegion(int index) {
     setState(() {
       _regionIndex = index;
-      _sightIndex = 0;
-      _foodIndex = 0;
-      _cafeIndex = 0;
+      _selectedVariant = 0;
+      _editableSpots = [];
+      _previewMetrics = null;
     });
     _loadRegion();
+  }
+
+  void _applyVariant(int index, List<Course> courses) {
+    final selected = courses[index.clamp(0, courses.length - 1)];
+    ref.read(homeCurationViewModelProvider.notifier).onSwipe(index);
+    setState(() {
+      _selectedVariant = index;
+      _editableSpots = List.of(selected.spots);
+      _previewMetrics = RouteMetrics(
+        distanceMeters: selected.totalDistanceMeters,
+        durationSeconds: selected.totalDurationSeconds,
+      );
+    });
+  }
+
+  Future<void> _refreshRoute() async {
+    final spots = _editableSpots;
+    if (spots.length < 2 || spots.any((spot) => spot.latitude == 0)) return;
+    setState(() => _routeUpdating = true);
+    try {
+      final metrics = await ref
+          .read(courseRepositoryProvider)
+          .previewRoute(spots);
+      if (mounted) setState(() => _previewMetrics = metrics);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('변경한 장소의 이동시간을 계산하지 못했어요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _routeUpdating = false);
+    }
+  }
+
+  void _removeSpot(int index) {
+    if (_editableSpots[index].id == '-1' || _editableSpots.length <= 2) return;
+    setState(() => _editableSpots.removeAt(index));
+    _refreshRoute();
+  }
+
+  void _replaceSpot(int index, CourseSpot replacement) {
+    setState(() => _editableSpots[index] = replacement);
+    _refreshRoute();
+  }
+
+  void _showAddSpot(List<CourseSpot> candidates) {
+    final existing = _editableSpots.map((spot) => spot.id).toSet();
+    final available = candidates
+        .where((spot) => !existing.contains(spot.id))
+        .toList();
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.all(16),
+          children: [
+            const Text(
+              '경유지 추가',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 10),
+            if (available.isEmpty)
+              const ListTile(title: Text('추가할 수 있는 실시간 추천 장소가 없어요.')),
+            ...available.map(
+              (spot) => ListTile(
+                leading: Icon(_spotIcon(spot.category)),
+                title: Text(spot.name),
+                subtitle: Text(_categoryLabel(spot.category)),
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() => _editableSpots.add(spot));
+                  _refreshRoute();
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showSpotDetails({
@@ -97,18 +184,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  SavedCourse _selectedCourse(Course? liveCourse) => SavedCourse(
-    id: liveCourse?.id ?? '${_combo.code}-$_sightIndex-$_foodIndex-$_cafeIndex',
+  SavedCourse _selectedCourse(
+    Course? liveCourse,
+    List<CourseSpot> spots,
+  ) => SavedCourse(
+    id: '${_combo.code}-${_routeTemplate.apiCode}-$_selectedVariant-${spots.map((e) => e.id).join('-')}',
     region: _combo.name,
-    title: liveCourse?.title ?? '${_combo.name} 취향 맞춤 3단 콤보',
-    places:
-        liveCourse?.spots.map((spot) => spot.name).toList() ??
-        [
-          if (_combo.code == 'NONSAN') '육군훈련소',
-          _combo.sights[_sightIndex],
-          _combo.foods[_foodIndex],
-          _combo.cafes[_cafeIndex],
-        ],
+    title: liveCourse?.title ?? '${_combo.name} 취향 맞춤 코스',
+    places: spots.isNotEmpty
+        ? spots.map((spot) => spot.name).toList()
+        : [
+            if (_combo.code == 'NONSAN') '육군훈련소',
+            _combo.sights.first,
+            _combo.foods.first,
+            _combo.cafes.first,
+          ],
   );
 
   @override
@@ -116,35 +206,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final curationState = ref.watch(homeCurationViewModelProvider);
     final loading = curationState.isLoading;
     final liveCourse = curationState.currentCourse;
-    final sightSpots = curationState.courses
-        .where((course) => course.spots.isNotEmpty)
-        .map((course) => course.spots[0])
-        .toList();
-    final foodSpots = curationState.courses
-        .where((course) => course.spots.length > 1)
-        .map((course) => course.spots[1])
-        .toList();
-    final cafeSpots = curationState.courses
-        .where((course) => course.spots.length > 2)
-        .map((course) => course.spots[2])
-        .toList();
-    final sightOptions = sightSpots.isNotEmpty
-        ? sightSpots.map((spot) => spot.name).toList()
-        : ApiConstants.useMockData
-        ? _combo.sights
-        : const ['실시간 관광정보를 불러오는 중'];
-    final foodOptions = foodSpots.isNotEmpty
-        ? foodSpots.map((spot) => spot.name).toList()
-        : ApiConstants.useMockData
-        ? _combo.foods
-        : const ['실시간 맛집 정보를 불러오는 중'];
-    final cafeOptions = cafeSpots.isNotEmpty
-        ? cafeSpots.map((spot) => spot.name).toList()
-        : ApiConstants.useMockData
-        ? _combo.cafes
-        : const ['실시간 카페 정보를 불러오는 중'];
+    final candidateSpots = _uniqueSpots(
+      curationState.courses.expand((course) => course.spots),
+    );
     final saved = ref.watch(savedCoursesProvider);
-    final selectedCourse = _selectedCourse(liveCourse);
+    final selectedSpots = _editableSpots;
+    final selectedCourse = _selectedCourse(liveCourse, selectedSpots);
     final isSaved = saved.any((course) => course.id == selectedCourse.id);
 
     return Scaffold(
@@ -199,7 +266,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   if (_combo.code == 'NONSAN') ...[
                     const SizedBox(height: 16),
-                    _NonsanEntryCard(party: _party, onChanged: _selectParty),
+                    _NonsanEntryCard(
+                      party: _party,
+                      duration: _duration,
+                      routeTemplate: _routeTemplate,
+                      course: liveCourse,
+                      onEdit: () => context.push('/preferences'),
+                    ),
                   ],
                   const SizedBox(height: 16),
                   _PreferenceSummary(
@@ -216,12 +289,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                   Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              '맞춤형 3단 콤보',
+                            const Text(
+                              '나만의 큐레이션 루트',
                               style: TextStyle(
                                 fontSize: 21,
                                 fontWeight: FontWeight.w900,
@@ -230,7 +303,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ),
                             SizedBox(height: 4),
                             Text(
-                              '각 단계를 눌러 원하는 장소로 바꿔보세요.',
+                              '${_editableSpots.length}개 경유지 · 추가하거나 삭제할 수 있어요.',
                               style: TextStyle(
                                 color: AppTheme.textSecondary,
                                 fontSize: 12,
@@ -274,79 +347,64 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   if (liveCourse == null && !ApiConstants.useMockData)
                     const _RealtimeWaitingCard(),
                   const SizedBox(height: 18),
-                  _ComboStep(
-                    number: 1,
-                    label: '볼거리',
-                    icon: Icons.landscape_rounded,
-                    color: AppTheme.accent,
-                    options: sightOptions,
-                    selectedIndex: _sightIndex.clamp(
-                      0,
-                      sightOptions.length - 1,
+                  if (curationState.courses.length >= 5) ...[
+                    _RouteVariantSelector(
+                      count: 5,
+                      selected: _selectedVariant,
+                      onSelected: (index) =>
+                          _applyVariant(index, curationState.courses),
                     ),
-                    onChanged: (value) => setState(() => _sightIndex = value),
-                    onInfo: () => _showSpotDetails(
-                      name:
-                          sightOptions[_sightIndex.clamp(
-                            0,
-                            sightOptions.length - 1,
-                          )],
-                      category: '볼거리',
-                      spot: sightSpots.isEmpty
-                          ? null
-                          : sightSpots[_sightIndex.clamp(
-                              0,
-                              sightSpots.length - 1,
-                            )],
-                    ),
-                  ),
-                  const _RouteConnector(),
-                  _ComboStep(
-                    number: 2,
-                    label: '먹거리',
-                    icon: Icons.restaurant_rounded,
-                    color: AppTheme.coral,
-                    options: foodOptions,
-                    selectedIndex: _foodIndex.clamp(0, foodOptions.length - 1),
-                    onChanged: (value) => setState(() => _foodIndex = value),
-                    onInfo: () => _showSpotDetails(
-                      name:
-                          foodOptions[_foodIndex.clamp(
-                            0,
-                            foodOptions.length - 1,
-                          )],
-                      category: '먹거리',
-                      spot: foodSpots.isEmpty
-                          ? null
-                          : foodSpots[_foodIndex.clamp(
-                              0,
-                              foodSpots.length - 1,
-                            )],
-                    ),
-                  ),
-                  const _RouteConnector(),
-                  _ComboStep(
-                    number: 3,
-                    label: '쉴거리',
-                    icon: Icons.local_cafe_rounded,
-                    color: const Color(0xFF6B68D9),
-                    options: cafeOptions,
-                    selectedIndex: _cafeIndex.clamp(0, cafeOptions.length - 1),
-                    onChanged: (value) => setState(() => _cafeIndex = value),
-                    onInfo: () => _showSpotDetails(
-                      name:
-                          cafeOptions[_cafeIndex.clamp(
-                            0,
-                            cafeOptions.length - 1,
-                          )],
-                      category: '쉴거리',
-                      spot: cafeSpots.isEmpty
-                          ? null
-                          : cafeSpots[_cafeIndex.clamp(
-                              0,
-                              cafeSpots.length - 1,
-                            )],
-                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  ..._editableSpots.asMap().entries.expand((entry) {
+                    final index = entry.key;
+                    final spot = entry.value;
+                    final alternatives = spot.id == '-1'
+                        ? [spot]
+                        : candidateSpots
+                              .where(
+                                (candidate) =>
+                                    candidate.category == spot.category ||
+                                    candidate.id == spot.id,
+                              )
+                              .toList();
+                    final selectedIndex = alternatives.indexWhere(
+                      (candidate) => candidate.id == spot.id,
+                    );
+                    return [
+                      _ComboStep(
+                        number: index + 1,
+                        label:
+                            spot.scheduledTime ?? _categoryLabel(spot.category),
+                        icon: _spotIcon(spot.category),
+                        color: _spotColor(spot.category),
+                        options: alternatives.isEmpty
+                            ? [spot.name]
+                            : alternatives.map((item) => item.name).toList(),
+                        selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
+                        onChanged: (value) =>
+                            _replaceSpot(index, alternatives[value]),
+                        onInfo: () => _showSpotDetails(
+                          name: spot.name,
+                          category: _categoryLabel(spot.category),
+                          spot: spot,
+                        ),
+                        onDelete: spot.id == '-1' || _editableSpots.length <= 2
+                            ? null
+                            : () => _removeSpot(index),
+                      ),
+                      if (index < _editableSpots.length - 1)
+                        const _RouteConnector(),
+                    ];
+                  }),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed:
+                        candidateSpots.isEmpty || _editableSpots.length >= 12
+                        ? null
+                        : () => _showAddSpot(candidateSpots),
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('경유지 추가'),
                   ),
                   const SizedBox(height: 18),
                   Container(
@@ -374,7 +432,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ),
                             const Spacer(),
                             Text(
-                              liveCourse?.formattedDuration ?? _combo.duration,
+                              _routeUpdating
+                                  ? '재계산 중'
+                                  : _formatDuration(
+                                      _previewMetrics?.durationSeconds ??
+                                          liveCourse?.totalDurationSeconds ??
+                                          0,
+                                      fallback: _combo.duration,
+                                    ),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 17,
@@ -440,10 +505,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 onPressed:
                                     liveCourse != null ||
                                         ApiConstants.useMockData
-                                    ? () => context.go('/map')
+                                    ? () {
+                                        ref
+                                            .read(
+                                              selectedRouteProvider.notifier,
+                                            )
+                                            .state = SelectedRoute(
+                                          title:
+                                              liveCourse?.title ??
+                                              '${_combo.name} 취향 맞춤 코스',
+                                          region: _combo.code,
+                                          spots: selectedSpots,
+                                          totalDistanceMeters:
+                                              _previewMetrics?.distanceMeters ??
+                                              liveCourse?.totalDistanceMeters ??
+                                              0,
+                                          totalDurationSeconds:
+                                              _previewMetrics
+                                                  ?.durationSeconds ??
+                                              liveCourse
+                                                  ?.totalDurationSeconds ??
+                                              0,
+                                        );
+                                        context.go('/map');
+                                      }
                                     : _loadRegion,
                                 icon: const Icon(Icons.navigation_rounded),
-                                label: const Text('이 콤보 시작하기'),
+                                label: const Text('이 루트 시작하기'),
                                 style: FilledButton.styleFrom(
                                   backgroundColor: Colors.white,
                                   foregroundColor: AppTheme.primary,
@@ -466,6 +554,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 }
+
+List<CourseSpot> _uniqueSpots(Iterable<CourseSpot> spots) {
+  final byId = <String, CourseSpot>{};
+  for (final spot in spots) {
+    byId.putIfAbsent(spot.id, () => spot);
+  }
+  return byId.values.toList();
+}
+
+String _formatDuration(int seconds, {required String fallback}) {
+  if (seconds <= 0) return fallback;
+  final minutes = (seconds / 60).round();
+  final hours = minutes ~/ 60;
+  final remainder = minutes % 60;
+  return hours > 0 ? '약 $hours시간 $remainder분' : '약 $remainder분';
+}
+
+String _categoryLabel(String category) => switch (category) {
+  'RESTAURANT' => '맛집',
+  'CAFE' => '카페',
+  'ACCOMMODATION' => '숙소',
+  _ => '유적지·관광지',
+};
+
+IconData _spotIcon(String category) => switch (category) {
+  'RESTAURANT' => Icons.restaurant_rounded,
+  'CAFE' => Icons.local_cafe_rounded,
+  'ACCOMMODATION' => Icons.hotel_rounded,
+  _ => Icons.account_balance_rounded,
+};
+
+Color _spotColor(String category) => switch (category) {
+  'RESTAURANT' => AppTheme.coral,
+  'CAFE' => const Color(0xFF6B68D9),
+  'ACCOMMODATION' => const Color(0xFF2E6EA6),
+  _ => AppTheme.accent,
+};
 
 class _RegionSelector extends StatelessWidget {
   const _RegionSelector({required this.selected, required this.onSelected});
@@ -606,6 +731,57 @@ class _RealtimeWaitingCard extends StatelessWidget {
   );
 }
 
+class _RouteVariantSelector extends StatelessWidget {
+  const _RouteVariantSelector({
+    required this.count,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final int count;
+  final int? selected;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        '최적 큐레이션 루트 5개',
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+      ),
+      const SizedBox(height: 9),
+      SizedBox(
+        height: 36,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: count,
+          separatorBuilder: (_, _) => const SizedBox(width: 7),
+          itemBuilder: (context, index) {
+            final active = selected == index;
+            return ChoiceChip(
+              label: Text('루트 ${index + 1}'),
+              selected: active,
+              showCheckmark: false,
+              onSelected: (_) => onSelected(index),
+              selectedColor: AppTheme.primary,
+              backgroundColor: Colors.white,
+              side: BorderSide(
+                color: active ? AppTheme.primary : AppTheme.divider,
+              ),
+              labelStyle: TextStyle(
+                color: active ? Colors.white : AppTheme.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            );
+          },
+        ),
+      ),
+    ],
+  );
+}
+
 class _ComboStep extends StatelessWidget {
   const _ComboStep({
     required this.number,
@@ -616,6 +792,7 @@ class _ComboStep extends StatelessWidget {
     required this.selectedIndex,
     required this.onChanged,
     required this.onInfo,
+    this.onDelete,
   });
   final int number;
   final String label;
@@ -625,6 +802,7 @@ class _ComboStep extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onChanged;
   final VoidCallback onInfo;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -713,6 +891,13 @@ class _ComboStep extends StatelessWidget {
             ],
           ),
         ),
+        if (onDelete != null)
+          IconButton(
+            tooltip: '경유지 삭제',
+            onPressed: onDelete,
+            icon: const Icon(Icons.remove_circle_outline_rounded),
+            color: AppTheme.textSecondary,
+          ),
       ],
     ),
   );
@@ -731,7 +916,7 @@ class _HourlyWeatherCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final forecasts = course?.hourlyWeather.take(4).toList() ?? const [];
+    final forecasts = course?.hourlyWeather.take(8).toList() ?? const [];
     final rainy = course?.weatherTag == 'RAINY';
     return Container(
       padding: const EdgeInsets.all(16),
@@ -778,46 +963,52 @@ class _HourlyWeatherCard extends StatelessWidget {
               ),
             )
           else
-            Row(
-              children: forecasts
-                  .map(
-                    (forecast) => Expanded(
-                      child: Column(
-                        children: [
-                          Text(
-                            forecast.time,
-                            style: const TextStyle(
-                              color: AppTheme.textSecondary,
-                              fontSize: 10,
-                            ),
+            SizedBox(
+              height: 82,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: forecasts.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final forecast = forecasts[index];
+                  return SizedBox(
+                    width: 58,
+                    child: Column(
+                      children: [
+                        Text(
+                          forecast.time,
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 10,
                           ),
-                          const SizedBox(height: 5),
-                          Icon(
-                            forecast.precipitationExpected
-                                ? Icons.water_drop_rounded
-                                : Icons.wb_sunny_outlined,
-                            size: 18,
-                            color: forecast.precipitationExpected
-                                ? const Color(0xFF5B7CFA)
-                                : AppTheme.warning,
+                        ),
+                        const SizedBox(height: 5),
+                        Icon(
+                          forecast.precipitationExpected
+                              ? Icons.water_drop_rounded
+                              : Icons.wb_sunny_outlined,
+                          size: 18,
+                          color: forecast.precipitationExpected
+                              ? const Color(0xFF5B7CFA)
+                              : AppTheme.warning,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${forecast.temperature}°',
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        Text(
+                          '강수 ${forecast.precipitationProbability}%',
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 9,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${forecast.temperature}°',
-                            style: const TextStyle(fontWeight: FontWeight.w900),
-                          ),
-                          Text(
-                            '강수 ${forecast.precipitationProbability}%',
-                            style: const TextStyle(
-                              color: AppTheme.textSecondary,
-                              fontSize: 9,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  )
-                  .toList(),
+                  );
+                },
+              ),
             ),
         ],
       ),
@@ -1070,10 +1261,19 @@ const _combos = [
 ];
 
 class _NonsanEntryCard extends StatelessWidget {
-  const _NonsanEntryCard({required this.party, required this.onChanged});
+  const _NonsanEntryCard({
+    required this.party,
+    required this.duration,
+    required this.routeTemplate,
+    required this.course,
+    required this.onEdit,
+  });
 
   final TravelParty party;
-  final ValueChanged<TravelParty> onChanged;
+  final TripDuration duration;
+  final RouteTemplate routeTemplate;
+  final Course? course;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -1108,36 +1308,67 @@ class _NonsanEntryCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        SegmentedButton<TravelParty>(
-          segments: TravelParty.values
-              .map(
-                (value) => ButtonSegment(
-                  value: value,
-                  label: Text(value.label),
-                  icon: Icon(
-                    value == TravelParty.enlistingSoldier
-                        ? Icons.groups_rounded
-                        : Icons.luggage_rounded,
+        InkWell(
+          onTap: onEdit,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(13),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.route_rounded, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        party.label,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        '${party == TravelParty.companion ? '${duration.label} · ' : ''}${routeTemplate.typeLabel} ${routeTemplate.title}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              )
-              .toList(),
-          selected: {party},
-          onSelectionChanged: (value) => onChanged(value.first),
-          style: ButtonStyle(
-            backgroundColor: WidgetStateProperty.resolveWith(
-              (states) => states.contains(WidgetState.selected)
-                  ? Colors.white
-                  : Colors.white.withValues(alpha: 0.08),
-            ),
-            foregroundColor: WidgetStateProperty.resolveWith(
-              (states) => states.contains(WidgetState.selected)
-                  ? AppTheme.primary
-                  : Colors.white,
+                const Icon(Icons.edit_rounded, color: Colors.white70, size: 18),
+              ],
             ),
           ),
         ),
         const SizedBox(height: 12),
+        if (party != TravelParty.traveler) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '${course?.recommendedStartTime ?? '--:--'} 출발 권장  →  '
+              '${course?.targetArrivalTime ?? '13:00'} 훈련소 도착',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         const Row(
           children: [
             Icon(Icons.shield_outlined, size: 16, color: Colors.white70),
@@ -1165,14 +1396,34 @@ class _PreferenceSummary extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     children: [
       Expanded(
-        child: Text(
-          concepts.map((concept) => '#${concept.label}').join('  '),
-          maxLines: 2,
-          style: const TextStyle(
-            color: AppTheme.primary,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-          ),
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: concepts
+              .map(
+                (concept) => Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.softMint,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(
+                      color: AppTheme.primary.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  child: Text(
+                    concept.label,
+                    style: const TextStyle(
+                      color: AppTheme.primary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
         ),
       ),
       TextButton(onPressed: onEdit, child: const Text('취향 변경')),

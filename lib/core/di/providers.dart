@@ -3,6 +3,7 @@ import 'package:flutterprojects/features/auth/viewmodels/auth_viewmodel.dart';
 import 'package:flutterprojects/core/network/dio_client.dart';
 import 'package:flutterprojects/core/utils/location_util.dart';
 import 'package:flutterprojects/features/home_curation/repositories/course_repository.dart';
+import 'package:flutterprojects/features/home_curation/models/selected_route.dart';
 import 'package:flutterprojects/features/home_curation/viewmodels/home_curation_viewmodel.dart';
 import 'package:flutterprojects/features/home_curation/viewmodels/home_curation_state.dart';
 import 'package:flutterprojects/features/map_search/repositories/place_repository.dart';
@@ -25,6 +26,8 @@ import 'package:flutterprojects/features/my_history/viewmodels/my_history_state.
 final dioProvider = Provider((ref) => DioClient.instance.dio);
 
 final locationUtilProvider = Provider((ref) => const LocationUtil());
+
+final selectedRouteProvider = StateProvider<SelectedRoute?>((ref) => null);
 
 final liveWidgetChannelProvider = Provider((ref) => LiveWidgetChannel());
 
