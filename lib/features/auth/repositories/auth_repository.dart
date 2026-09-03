@@ -5,7 +5,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthRepository {
   AuthRepository({firebase_auth.FirebaseAuth? firebaseAuth})
-      : _firebaseAuth = firebaseAuth ?? firebase_auth.FirebaseAuth.instance;
+    : _firebaseAuth = firebaseAuth ?? firebase_auth.FirebaseAuth.instance;
 
   final firebase_auth.FirebaseAuth _firebaseAuth;
 
@@ -54,6 +54,15 @@ class AuthRepository {
 
   Future<void> logout() async {
     await _firebaseAuth.signOut();
+    if (!kIsWeb) {
+      await GoogleSignIn.instance.signOut();
+    }
+  }
+
+  Future<void> deleteAccount() async {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) return;
+    await user.delete();
     if (!kIsWeb) {
       await GoogleSignIn.instance.signOut();
     }

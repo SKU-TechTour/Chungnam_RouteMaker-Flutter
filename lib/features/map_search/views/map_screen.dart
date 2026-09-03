@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' as fm;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' as ll;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../home_curation/models/course.dart';
+import '../../home_curation/models/selected_route.dart';
+import '../viewmodels/journey_progress_provider.dart';
 import '../models/place.dart';
 
 const _regionCenters = {
@@ -173,10 +177,86 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
+  Future<void> _openNavigation(CourseSpot spot) async {
+    final uri = Uri.parse(
+      'https://map.kakao.com/link/to/${Uri.encodeComponent(spot.name)},'
+      '${spot.latitude},${spot.longitude}',
+    );
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+        mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('길안내 앱을 열지 못했어요.')));
+    }
+  }
+
+  Future<void> _confirmArrival(CourseSpot spot) async {
+    setState(() => _locating = true);
+    try {
+      final position = await ref
+          .read(locationUtilProvider)
+          .getCurrentPosition();
+      final distance = const ll.Distance().as(
+        ll.LengthUnit.Meter,
+        ll.LatLng(position.lat, position.lng),
+        ll.LatLng(spot.latitude, spot.longitude),
+      );
+      if (!mounted) return;
+      if (distance > 500) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '목적지까지 약 ${distance.round()}m 남았어요. 500m 안에서 완료할 수 있어요.',
+            ),
+          ),
+        );
+        return;
+      }
+      final finished = await ref
+          .read(journeyProgressProvider.notifier)
+          .completeCurrentStop();
+      if (!mounted) return;
+      if (finished) {
+        await ref.read(myHistoryViewModelProvider.notifier).loadHistory();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('코스를 완주했어요. 영수증과 스탬프가 기록됐습니다!')),
+        );
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('방문 완료! 다음 장소로 이동해보세요.')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('도착 확인을 위해 위치 권한을 허용해주세요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  bool _sameRoute(SelectedRoute first, SelectedRoute second) {
+    if (first.spots.length != second.spots.length) return false;
+    for (var index = 0; index < first.spots.length; index++) {
+      if (first.spots[index].id != second.spots[index].id) return false;
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(mapSearchViewModelProvider);
     final selectedRoute = ref.watch(selectedRouteProvider);
+    final journey = ref.watch(journeyProgressProvider);
+    final activeJourney =
+        selectedRoute != null &&
+            journey != null &&
+            _sameRoute(selectedRoute, journey.route)
+        ? journey
+        : null;
     final places = selectedRoute == null
         ? state.places
         : selectedRoute.spots.map(Place.fromCourseSpot).toList();
@@ -373,6 +453,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   _ApiErrorBanner(message: message, onRetry: _search),
                 ],
                 const Spacer(),
+                if (selectedRoute != null)
+                  _JourneyControlCard(
+                    progress: activeJourney,
+                    route: selectedRoute,
+                    locating: _locating,
+                    onStart: () => ref
+                        .read(journeyProgressProvider.notifier)
+                        .start(selectedRoute),
+                    onNavigate: _openNavigation,
+                    onConfirm: _confirmArrival,
+                  ),
                 _RoutePreview(
                   places: places,
                   isLoading: selectedRoute == null && state.isLoading,
@@ -382,6 +473,147 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _JourneyControlCard extends StatelessWidget {
+  const _JourneyControlCard({
+    required this.progress,
+    required this.route,
+    required this.locating,
+    required this.onStart,
+    required this.onNavigate,
+    required this.onConfirm,
+  });
+
+  final JourneyProgress? progress;
+  final SelectedRoute route;
+  final bool locating;
+  final VoidCallback onStart;
+  final ValueChanged<CourseSpot> onNavigate;
+  final ValueChanged<CourseSpot> onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = progress?.currentSpot;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.primary,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primary.withValues(alpha: 0.2),
+            blurRadius: 16,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: progress == null
+          ? Row(
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '코스 여행 시작',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        'GPS로 방문을 확인하며 순서대로 진행해요.',
+                        style: TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                FilledButton(
+                  onPressed: onStart,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppTheme.primary,
+                  ),
+                  child: const Text('시작'),
+                ),
+              ],
+            )
+          : progress!.completed
+          ? const Row(
+              children: [
+                Icon(Icons.verified_rounded, color: Colors.white),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '완주 완료 · 내 정보에 기록되었습니다.',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${progress!.currentIndex + 1}/${route.spots.length} 다음 목적지',
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  current!.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => onNavigate(current),
+                        icon: const Icon(Icons.navigation_rounded, size: 17),
+                        label: const Text('길안내'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white38),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: locating ? null : () => onConfirm(current),
+                        icon: locating
+                            ? const SizedBox(
+                                width: 15,
+                                height: 15,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.location_on_rounded, size: 17),
+                        label: const Text('도착 확인'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppTheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
     );
   }
 }

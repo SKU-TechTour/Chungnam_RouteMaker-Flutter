@@ -9,6 +9,7 @@ import '../../../core/widgets/route_maker_logo.dart';
 import '../../saved/models/saved_course.dart';
 import '../../saved/viewmodels/saved_courses_provider.dart';
 import '../models/course.dart';
+import '../models/home_session.dart';
 import '../models/selected_route.dart';
 import '../../travel_preferences/models/travel_preferences.dart';
 import '../../travel_preferences/repositories/travel_preferences_repository.dart';
@@ -38,6 +39,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    final session = ref.read(homeSessionProvider);
+    if (session != null) {
+      _regionIndex = session.regionIndex;
+      _party = session.preferences.party;
+      _duration = session.preferences.duration;
+      _routeTemplate = session.preferences.routeTemplate;
+      _concepts = session.preferences.concepts;
+      _editableSpots = List.of(session.editableSpots);
+      _selectedVariant = session.selectedVariant;
+      _previewMetrics = session.previewMetrics;
+    }
     _loadPreferences();
   }
 
@@ -52,7 +64,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _concepts = preferences.concepts;
       });
     }
+    final existing = ref.read(homeSessionProvider);
+    if (existing != null &&
+        (preferences == null ||
+            existing.preferenceSignature ==
+                travelPreferenceSignature(preferences))) {
+      return;
+    }
     await _loadRegion();
+  }
+
+  TravelPreferences get _preferences => TravelPreferences(
+    party: _party,
+    concepts: _concepts,
+    duration: _duration,
+    routeTemplate: _routeTemplate,
+  );
+
+  void _persistSession() {
+    final preferences = _preferences;
+    ref.read(homeSessionProvider.notifier).state = HomeSession(
+      regionIndex: _regionIndex,
+      preferences: preferences,
+      preferenceSignature: travelPreferenceSignature(preferences),
+      editableSpots: List.unmodifiable(_editableSpots),
+      selectedVariant: _selectedVariant,
+      previewMetrics: _previewMetrics,
+    );
   }
 
   Future<void> _loadRegion() async {
@@ -80,6 +118,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _editableSpots = [];
       _previewMetrics = null;
     });
+    _persistSession();
     _loadRegion();
   }
 
@@ -94,6 +133,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         durationSeconds: selected.totalDurationSeconds,
       );
     });
+    _persistSession();
   }
 
   Future<void> _refreshRoute() async {
@@ -104,7 +144,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final metrics = await ref
           .read(courseRepositoryProvider)
           .previewRoute(spots);
-      if (mounted) setState(() => _previewMetrics = metrics);
+      if (mounted) {
+        setState(() => _previewMetrics = metrics);
+        _persistSession();
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -119,11 +162,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _removeSpot(int index) {
     if (_editableSpots[index].id == '-1' || _editableSpots.length <= 2) return;
     setState(() => _editableSpots.removeAt(index));
+    _persistSession();
     _refreshRoute();
   }
 
   void _replaceSpot(int index, CourseSpot replacement) {
     setState(() => _editableSpots[index] = replacement);
+    _persistSession();
     _refreshRoute();
   }
 
@@ -154,6 +199,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onTap: () {
                   Navigator.pop(context);
                   setState(() => _editableSpots.add(spot));
+                  _persistSession();
                   _refreshRoute();
                 },
               ),
@@ -184,22 +230,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  SavedCourse _selectedCourse(
-    Course? liveCourse,
-    List<CourseSpot> spots,
-  ) => SavedCourse(
-    id: '${_combo.code}-${_routeTemplate.apiCode}-$_selectedVariant-${spots.map((e) => e.id).join('-')}',
-    region: _combo.name,
-    title: liveCourse?.title ?? '${_combo.name} 취향 맞춤 코스',
-    places: spots.isNotEmpty
-        ? spots.map((spot) => spot.name).toList()
-        : [
-            if (_combo.code == 'NONSAN') '육군훈련소',
-            _combo.sights.first,
-            _combo.foods.first,
-            _combo.cafes.first,
-          ],
-  );
+  SavedCourse _selectedCourse(Course? liveCourse, List<CourseSpot> spots) =>
+      SavedCourse(
+        id: '${_combo.code}-${_routeTemplate.apiCode}-$_selectedVariant',
+        region: _combo.name,
+        regionCode: _combo.code,
+        title: liveCourse?.title ?? '${_combo.name} 취향 맞춤 코스',
+        spots: List.unmodifiable(spots),
+        totalDistanceMeters:
+            _previewMetrics?.distanceMeters ??
+            liveCourse?.totalDistanceMeters ??
+            0,
+        totalDurationSeconds:
+            _previewMetrics?.durationSeconds ??
+            liveCourse?.totalDurationSeconds ??
+            0,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -212,7 +258,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final saved = ref.watch(savedCoursesProvider);
     final selectedSpots = _editableSpots;
     final selectedCourse = _selectedCourse(liveCourse, selectedSpots);
-    final isSaved = saved.any((course) => course.id == selectedCourse.id);
+    final isSaved = saved.any((course) => course.hasSameRoute(selectedCourse));
 
     return Scaffold(
       body: SafeArea(
@@ -1039,6 +1085,9 @@ class _SpotDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * 0.86,
+    ),
     padding: EdgeInsets.fromLTRB(
       22,
       12,
@@ -1049,123 +1098,163 @@ class _SpotDetailSheet extends StatelessWidget {
       color: Colors.white,
       borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
     ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Center(
-          child: Container(
-            width: 42,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppTheme.divider,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        if (spot?.imageUrl case final imageUrl?)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Image.network(
-              imageUrl,
-              width: double.infinity,
-              height: 180,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-            ),
-          ),
-        if (spot?.imageUrl != null) const SizedBox(height: 18),
-        Text(
-          category,
-          style: const TextStyle(
-            color: AppTheme.accent,
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          name,
-          style: const TextStyle(fontFamily: AppTheme.gowunDodum, fontSize: 25),
-        ),
-        const SizedBox(height: 12),
-        FutureBuilder<Map<String, dynamic>?>(
-          future: details,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: LinearProgressIndicator(minHeight: 3),
-              );
-            }
-            final detail = snapshot.data;
-            final overview = _plainText(detail?['overview'] as String? ?? '');
-            final address = detail?['address'] as String? ?? spot?.address;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  overview.isNotEmpty
-                      ? overview
-                      : '한국관광공사 TourAPI에서 제공한 장소입니다.',
-                  maxLines: 8,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppTheme.textSecondary,
-                    height: 1.55,
-                  ),
-                ),
-                if (address?.isNotEmpty == true) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.place_outlined,
-                        size: 17,
-                        color: AppTheme.textSecondary,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          address!,
-                          style: const TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            const Icon(
-              Icons.cloud_done_outlined,
-              size: 17,
-              color: AppTheme.primary,
-            ),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(
-                spot?.source ?? 'TOUR_API_REALTIME',
-                style: const TextStyle(
-                  color: AppTheme.primary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
+    child: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.divider,
+                borderRadius: BorderRadius.circular(4),
               ),
             ),
-          ],
-        ),
-      ],
+          ),
+          const SizedBox(height: 18),
+          if (spot?.imageUrl case final imageUrl?)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.network(
+                imageUrl,
+                width: double.infinity,
+                height: 180,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+          if (spot?.imageUrl != null) const SizedBox(height: 18),
+          Text(
+            category,
+            style: const TextStyle(
+              color: AppTheme.accent,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            name,
+            style: const TextStyle(
+              fontFamily: AppTheme.gowunDodum,
+              fontSize: 25,
+            ),
+          ),
+          const SizedBox(height: 12),
+          FutureBuilder<Map<String, dynamic>?>(
+            future: details,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: LinearProgressIndicator(minHeight: 3),
+                );
+              }
+              final detail = snapshot.data;
+              final overview = _plainText(detail?['overview'] as String? ?? '');
+              final address = detail?['address'] as String? ?? spot?.address;
+              final telephone = _plainText(
+                detail?['telephone'] as String? ?? '',
+              );
+              final homepage = _plainText(detail?['homepage'] as String? ?? '');
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    overview.isNotEmpty
+                        ? overview
+                        : '한국관광공사 TourAPI에서 제공한 장소입니다.',
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      height: 1.55,
+                    ),
+                  ),
+                  if (address?.isNotEmpty == true) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.place_outlined,
+                          size: 17,
+                          color: AppTheme.textSecondary,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            address!,
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (telephone.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    _DetailInfoRow(icon: Icons.phone_outlined, text: telephone),
+                  ],
+                  if (homepage.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    _DetailInfoRow(
+                      icon: Icons.language_rounded,
+                      text: homepage,
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const Icon(
+                Icons.cloud_done_outlined,
+                size: 17,
+                color: AppTheme.primary,
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  spot?.source ?? 'TOUR_API_REALTIME',
+                  style: const TextStyle(
+                    color: AppTheme.primary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     ),
+  );
+}
+
+class _DetailInfoRow extends StatelessWidget {
+  const _DetailInfoRow({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Icon(icon, size: 17, color: AppTheme.textSecondary),
+      const SizedBox(width: 6),
+      Expanded(
+        child: SelectableText(
+          text,
+          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+        ),
+      ),
+    ],
   );
 }
 

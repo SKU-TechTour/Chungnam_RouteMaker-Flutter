@@ -4,11 +4,13 @@ import 'package:flutterprojects/core/network/dio_client.dart';
 import 'package:flutterprojects/core/utils/location_util.dart';
 import 'package:flutterprojects/features/home_curation/repositories/course_repository.dart';
 import 'package:flutterprojects/features/home_curation/models/selected_route.dart';
+import 'package:flutterprojects/features/home_curation/models/home_session.dart';
 import 'package:flutterprojects/features/home_curation/viewmodels/home_curation_viewmodel.dart';
 import 'package:flutterprojects/features/home_curation/viewmodels/home_curation_state.dart';
 import 'package:flutterprojects/features/map_search/repositories/place_repository.dart';
 import 'package:flutterprojects/features/map_search/viewmodels/map_search_viewmodel.dart';
 import 'package:flutterprojects/features/map_search/viewmodels/map_search_state.dart';
+import 'package:flutterprojects/features/map_search/viewmodels/journey_progress_provider.dart';
 import 'package:flutterprojects/features/military_guide/data/platform/live_widget_channel.dart';
 import 'package:flutterprojects/features/military_guide/repositories/military_repository.dart';
 import 'package:flutterprojects/features/military_guide/viewmodels/military_guide_viewmodel.dart';
@@ -28,6 +30,8 @@ final dioProvider = Provider((ref) => DioClient.instance.dio);
 final locationUtilProvider = Provider((ref) => const LocationUtil());
 
 final selectedRouteProvider = StateProvider<SelectedRoute?>((ref) => null);
+
+final homeSessionProvider = StateProvider<HomeSession?>((ref) => null);
 
 final liveWidgetChannelProvider = Provider((ref) => LiveWidgetChannel());
 
@@ -53,6 +57,11 @@ final rewardRemoteRepositoryProvider = Provider(
 );
 
 final stampLocalRepositoryProvider = Provider((ref) => StampLocalRepository());
+
+final journeyProgressProvider =
+    StateNotifierProvider<JourneyProgressNotifier, JourneyProgress?>((ref) {
+      return JourneyProgressNotifier(ref.watch(stampLocalRepositoryProvider));
+    });
 
 // --- ViewModels ---
 

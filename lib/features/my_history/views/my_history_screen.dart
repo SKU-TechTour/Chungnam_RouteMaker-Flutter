@@ -8,6 +8,9 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../saved/viewmodels/saved_courses_provider.dart';
+import '../models/receipt.dart';
+import '../models/stamp.dart';
 
 class MyHistoryScreen extends ConsumerStatefulWidget {
   const MyHistoryScreen({super.key});
@@ -56,8 +59,10 @@ class _MyHistoryScreenState extends ConsumerState<MyHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authViewModelProvider).user;
     final history = ref.watch(myHistoryViewModelProvider);
+    final latestReceipt = history.receipts.isEmpty
+        ? null
+        : history.receipts.first;
     final visitedPlaces = history.receipts.fold<int>(
       0,
       (sum, receipt) => sum + receipt.amount,
@@ -72,44 +77,23 @@ class _MyHistoryScreenState extends ConsumerState<MyHistoryScreen> {
                 children: [
                   Row(
                     children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: const BoxDecoration(
-                          color: AppTheme.softMint,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.person_rounded,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 13),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${user?.name ?? '여행자'}님, 반가워요',
-                              style: const TextStyle(
-                                fontSize: 19,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const Text(
-                              '나의 충남 여행 기록',
-                              style: TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
+                      const Expanded(
+                        child: Text(
+                          '나의 충남 여행 기록',
+                          style: TextStyle(
+                            fontFamily: AppTheme.gowunDodum,
+                            fontSize: 25,
+                            fontWeight: FontWeight.w400,
+                          ),
                         ),
                       ),
                       IconButton(
                         tooltip: '로그아웃',
                         onPressed: () async {
                           await ref.read(authViewModelProvider).logout();
+                          ref.read(homeSessionProvider.notifier).state = null;
+                          ref.read(selectedRouteProvider.notifier).state = null;
+                          ref.read(journeyProgressProvider.notifier).clear();
                           if (context.mounted) context.go('/login');
                         },
                         icon: const Icon(Icons.logout_rounded),
@@ -170,7 +154,9 @@ class _MyHistoryScreenState extends ConsumerState<MyHistoryScreen> {
                         ),
                       ),
                       FilledButton.icon(
-                        onPressed: () => _shareReceipt(context),
+                        onPressed: latestReceipt == null
+                            ? null
+                            : () => _shareReceipt(context),
                         icon: const Icon(Icons.ios_share_rounded, size: 17),
                         label: const Text('기록 공유'),
                         style: FilledButton.styleFrom(
@@ -186,10 +172,14 @@ class _MyHistoryScreenState extends ConsumerState<MyHistoryScreen> {
                   ),
                   const SizedBox(height: 16),
                   GestureDetector(
-                    onTap: () => context.push('/history/receipt'),
+                    onTap: latestReceipt == null
+                        ? null
+                        : () => context.push('/history/receipt'),
                     child: RepaintBoundary(
                       key: _receiptCardKey,
-                      child: const _ReceiptCard(),
+                      child: latestReceipt == null
+                          ? const _EmptyReceiptCard()
+                          : _ReceiptCard(receipt: latestReceipt),
                     ),
                   ),
                   const SizedBox(height: 30),
@@ -208,63 +198,41 @@ class _MyHistoryScreenState extends ConsumerState<MyHistoryScreen> {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  const Row(
-                    children: [
-                      Expanded(
-                        child: _StampCard(
-                          region: '논산',
-                          date: '08.24',
-                          color: AppTheme.coral,
-                          icon: Icons.camera_alt_rounded,
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: _StampCard(
-                          region: '공주',
-                          date: '08.12',
-                          color: AppTheme.accent,
-                          icon: Icons.account_balance_rounded,
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: _StampCard(
-                          region: '부여',
-                          date: '다음 여행',
-                          color: Color(0xFF6B68D9),
-                          icon: Icons.lock_outline_rounded,
-                          locked: true,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
-                  const _SectionTitle(
-                    title: '나의 로컬 혜택',
-                    subtitle: '여행할수록 커지는 지역별 혜택이에요.',
-                  ),
-                  const SizedBox(height: 14),
-                  const _BenefitCard(
-                    icon: Icons.local_cafe_rounded,
-                    color: AppTheme.coral,
-                    title: '논산 로컬 카페 10% 할인',
-                    description: '논산 콤보 완주자 전용 · 9월 30일까지',
-                  ),
-                  const SizedBox(height: 10),
-                  const _BenefitCard(
-                    icon: Icons.confirmation_number_rounded,
-                    color: AppTheme.accent,
-                    title: '공주 박물관 굿즈 쿠폰',
-                    description: '공주 마스터 레벨 1 달성 혜택',
-                  ),
+                  Row(children: _stampCards(history.stamps)),
                   const SizedBox(height: 30),
                   const _SectionTitle(
                     title: '지역 마스터 뱃지',
-                    subtitle: '지역을 더 깊이 여행하면 뱃지가 성장해요.',
+                    subtitle: '논산·공주·부여 코스를 모두 완주하면 획득해요.',
                   ),
                   const SizedBox(height: 14),
-                  const _MasterBadge(),
+                  _MasterBadge(
+                    unlocked: {'NONSAN', 'GONGJU', 'BUYEO'}.every(
+                      (region) =>
+                          history.stamps.any((stamp) => stamp.region == region),
+                    ),
+                    completedRegions: history.stamps
+                        .where(
+                          (stamp) => const {
+                            'NONSAN',
+                            'GONGJU',
+                            'BUYEO',
+                          }.contains(stamp.region),
+                        )
+                        .map((stamp) => stamp.region)
+                        .toSet()
+                        .length,
+                  ),
+                  const SizedBox(height: 22),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => _confirmAccountDeletion(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.textSecondary,
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                      child: const Text('계정 및 여행 데이터 삭제'),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -272,6 +240,45 @@ class _MyHistoryScreenState extends ConsumerState<MyHistoryScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmAccountDeletion(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('계정을 삭제할까요?'),
+        content: const Text(
+          'Firebase 계정과 이 기기에 저장된 취향, 찜, 완주 기록이 모두 삭제되며 복구할 수 없습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.coral),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final deleted = await ref.read(authViewModelProvider).deleteAccount();
+    if (!context.mounted) return;
+    if (!deleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('계정 삭제를 완료하지 못했어요. 다시 로그인한 뒤 시도해주세요.')),
+      );
+      return;
+    }
+    ref.read(savedCoursesProvider.notifier).reset();
+    ref.read(homeSessionProvider.notifier).state = null;
+    ref.read(selectedRouteProvider.notifier).state = null;
+    ref.read(journeyProgressProvider.notifier).clear();
+    ref.invalidate(myHistoryViewModelProvider);
+    if (context.mounted) context.go('/onboarding');
   }
 }
 
@@ -314,7 +321,9 @@ class _StatCard extends StatelessWidget {
 }
 
 class _ReceiptCard extends StatelessWidget {
-  const _ReceiptCard();
+  const _ReceiptCard({required this.receipt});
+
+  final Receipt receipt;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -342,17 +351,17 @@ class _ReceiptCard extends StatelessWidget {
               fit: BoxFit.cover,
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     '충남 루트메이커',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
                   ),
                   Text(
-                    'NONSAN · 2026.08.24',
-                    style: TextStyle(
+                    '${_regionLabel(receipt.region)} · ${_date(receipt.visitedAt)}',
+                    style: const TextStyle(
                       fontSize: 10,
                       color: AppTheme.textSecondary,
                       letterSpacing: 0.5,
@@ -368,8 +377,8 @@ class _ReceiptCard extends StatelessWidget {
           padding: EdgeInsets.symmetric(vertical: 16),
           child: Divider(color: Color(0xFFE8DFCC)),
         ),
-        const Text(
-          '논산에서 만든 우리의 하루',
+        Text(
+          receipt.title,
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w900,
@@ -377,17 +386,20 @@ class _ReceiptCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        const _ReceiptLine(number: '01', title: '선샤인 스튜디오', category: '볼거리'),
-        const _ReceiptLine(number: '02', title: '연무대 골목 고기집', category: '먹거리'),
-        const _ReceiptLine(number: '03', title: '탑정호 베이커리카페', category: '쉴거리'),
+        for (var index = 0; index < receipt.places.length; index++)
+          _ReceiptLine(
+            number: '${index + 1}'.padLeft(2, '0'),
+            title: receipt.places[index],
+            category: '완료',
+          ),
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 14),
           child: Divider(color: Color(0xFFE8DFCC)),
         ),
-        const Row(
+        Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
+            const Text(
               'TOTAL JOURNEY',
               style: TextStyle(
                 fontSize: 10,
@@ -396,10 +408,51 @@ class _ReceiptCard extends StatelessWidget {
               ),
             ),
             Text(
-              '3 PLACES · 1 MEMORY',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+              '${receipt.amount} PLACES · 1 MEMORY',
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
             ),
           ],
+        ),
+      ],
+    ),
+  );
+
+  static String _date(DateTime value) =>
+      '${value.year}.${value.month.toString().padLeft(2, '0')}.${value.day.toString().padLeft(2, '0')}';
+
+  static String _regionLabel(String value) => switch (value) {
+    'GONGJU' => '공주',
+    'BUYEO' => '부여',
+    _ => '논산',
+  };
+}
+
+class _EmptyReceiptCard extends StatelessWidget {
+  const _EmptyReceiptCard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 38),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFFCF4),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: const Color(0xFFE8DFCC)),
+    ),
+    child: const Column(
+      children: [
+        Icon(
+          Icons.receipt_long_outlined,
+          size: 42,
+          color: AppTheme.textSecondary,
+        ),
+        SizedBox(height: 14),
+        Text('아직 완주한 여행이 없어요', style: TextStyle(fontWeight: FontWeight.w900)),
+        SizedBox(height: 5),
+        Text(
+          '코스의 모든 장소에 도착하면 여행 영수증이 만들어져요.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
         ),
       ],
     ),
@@ -518,79 +571,20 @@ class _StampCard extends StatelessWidget {
   );
 }
 
-class _BenefitCard extends StatelessWidget {
-  const _BenefitCard({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.description,
-  });
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String description;
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$title 혜택은 데모 종료 후 쿠폰함에서 사용할 수 있어요.')),
-    ),
-    child: Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Icon(icon, color: color),
-          ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppTheme.textSecondary,
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
 class _MasterBadge extends StatelessWidget {
-  const _MasterBadge();
+  const _MasterBadge({required this.unlocked, required this.completedRegions});
+
+  final bool unlocked;
+  final int completedRegions;
 
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [AppTheme.primary, Color(0xFF286A62)],
+      gradient: LinearGradient(
+        colors: unlocked
+            ? const [AppTheme.primary, Color(0xFF286A62)]
+            : const [Color(0xFF9A9E9D), Color(0xFF747877)],
       ),
       borderRadius: BorderRadius.circular(24),
     ),
@@ -616,8 +610,8 @@ class _MasterBadge extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '논산 로컬 마스터',
+              Text(
+                unlocked ? '충남 3개 지역 마스터' : '충남 지역 마스터',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 17,
@@ -626,7 +620,9 @@ class _MasterBadge extends StatelessWidget {
               ),
               const SizedBox(height: 5),
               Text(
-                '다음 레벨까지 장소 2곳',
+                unlocked
+                    ? '논산·공주·부여 완주를 축하해요!'
+                    : '논산·공주·부여 중 $completedRegions/3 지역 완주',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.65),
                   fontSize: 11,
@@ -635,10 +631,10 @@ class _MasterBadge extends StatelessWidget {
               const SizedBox(height: 10),
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: const LinearProgressIndicator(
-                  value: 0.68,
+                child: LinearProgressIndicator(
+                  value: completedRegions.clamp(0, 3) / 3,
                   minHeight: 7,
-                  color: AppTheme.coral,
+                  color: unlocked ? AppTheme.coral : Colors.white70,
                   backgroundColor: Colors.white24,
                 ),
               ),
@@ -648,4 +644,37 @@ class _MasterBadge extends StatelessWidget {
       ],
     ),
   );
+}
+
+List<Widget> _stampCards(List<Stamp> stamps) {
+  const regions = [
+    ('NONSAN', '논산', AppTheme.coral, Icons.terrain_rounded),
+    ('GONGJU', '공주', AppTheme.primary, Icons.account_balance_rounded),
+    ('BUYEO', '부여', Color(0xFF8A5DB1), Icons.park_rounded),
+  ];
+
+  return regions.map((region) {
+    Stamp? earned;
+    for (final stamp in stamps) {
+      if (stamp.region == region.$1) {
+        earned = stamp;
+        break;
+      }
+    }
+    final date = earned == null
+        ? '미완주'
+        : '${earned.earnedAt.year}.${earned.earnedAt.month.toString().padLeft(2, '0')}.${earned.earnedAt.day.toString().padLeft(2, '0')}';
+    return Expanded(
+      child: Padding(
+        padding: EdgeInsets.only(right: region.$1 == 'BUYEO' ? 0 : 8),
+        child: _StampCard(
+          region: region.$2,
+          date: date,
+          color: region.$3,
+          icon: region.$4,
+          locked: earned == null,
+        ),
+      ),
+    );
+  }).toList();
 }

@@ -34,31 +34,29 @@ class _ReceiptShareScreenState extends ConsumerState<ReceiptShareScreen> {
           message: msg,
           onRetry: notifier.loadHistory,
         ),
-        _ => ListView.builder(
-          itemCount: state.receipts.length,
-          itemBuilder: (context, index) {
-            final receipt = state.receipts[index];
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ListTile(
-                title: Text(receipt.title),
-                subtitle: Text('${receipt.amount}원 · ${receipt.visitedAt}'),
-                trailing: IconButton(
-                  icon: state.isSharing
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.share),
-                  onPressed: state.isSharing
-                      ? null
-                      : () => notifier.shareReceipt(receipt.id),
+        _ =>
+          state.receipts.isEmpty
+              ? const Center(child: Text('완주 후 공유할 여행 기록이 여기에 표시돼요.'))
+              : ListView.builder(
+                  itemCount: state.receipts.length,
+                  itemBuilder: (context, index) {
+                    final receipt = state.receipts[index];
+                    final date = receipt.visitedAt;
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: ListTile(
+                        title: Text(receipt.title),
+                        subtitle: Text(
+                          '${receipt.amount}곳 · ${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}',
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                      ),
+                    );
+                  },
                 ),
-              ),
-            );
-          },
-        ),
       },
     );
   }

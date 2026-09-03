@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/di/providers.dart';
 import '../models/saved_course.dart';
 import '../viewmodels/saved_courses_provider.dart';
 
@@ -57,7 +58,12 @@ class SavedScreen extends ConsumerWidget {
                     onRemove: () => ref
                         .read(savedCoursesProvider.notifier)
                         .remove(entry.value.id),
-                    onStart: () => context.go('/map'),
+                    onStart: () {
+                      ref.read(selectedRouteProvider.notifier).state = entry
+                          .value
+                          .toSelectedRoute();
+                      context.go('/map');
+                    },
                   ),
                 ),
               ],

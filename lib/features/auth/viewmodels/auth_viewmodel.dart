@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../repositories/auth_repository.dart';
 
@@ -73,5 +74,25 @@ class AuthViewModel extends ChangeNotifier {
     _user = null;
     _state = AuthState.idle;
     notifyListeners();
+  }
+
+  Future<bool> deleteAccount() async {
+    _state = AuthState.loading;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _repository.deleteAccount();
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.clear();
+      _user = null;
+      _state = AuthState.idle;
+      notifyListeners();
+      return true;
+    } catch (error) {
+      _errorMessage = error.toString();
+      _state = AuthState.error;
+      notifyListeners();
+      return false;
+    }
   }
 }

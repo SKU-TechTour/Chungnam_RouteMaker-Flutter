@@ -9,15 +9,12 @@ class MyHistoryViewModel extends Notifier<MyHistoryState> {
   Future<void> loadHistory() async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final snapshot = await ref
-          .read(rewardRemoteRepositoryProvider)
-          .fetchRewards();
-      final localStamps = await ref
-          .read(stampLocalRepositoryProvider)
-          .loadStamps();
+      final repository = ref.read(stampLocalRepositoryProvider);
+      final receipts = await repository.loadReceipts();
+      final localStamps = await repository.loadStamps();
       state = state.copyWith(
-        receipts: snapshot.receipts,
-        stamps: localStamps.isEmpty ? snapshot.stamps : localStamps,
+        receipts: receipts,
+        stamps: localStamps,
         isLoading: false,
       );
     } catch (_) {
