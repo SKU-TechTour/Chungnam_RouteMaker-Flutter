@@ -17,8 +17,12 @@ class DioClient {
       Dio(
           BaseOptions(
             baseUrl: ApiConstants.baseUrl,
-            connectTimeout: const Duration(seconds: 10),
-            receiveTimeout: const Duration(seconds: 10),
+            // 코스 응답은 TourAPI·기상청·카카오 경로를 조합하므로 모바일망에서
+            // 10초를 넘길 수 있습니다. 연결 실패는 빠르게 감지하되 정상적인 실시간
+            // 조합 응답은 기다릴 수 있도록 수신 제한을 넉넉하게 둡니다.
+            connectTimeout: const Duration(seconds: 15),
+            sendTimeout: const Duration(seconds: 15),
+            receiveTimeout: const Duration(seconds: 45),
             headers: {'Content-Type': 'application/json'},
           ),
         )

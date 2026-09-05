@@ -1,8 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../travel_preferences/repositories/travel_preferences_repository.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -35,9 +37,20 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
     final preferences = await SharedPreferences.getInstance();
     if (!mounted) return;
-    context.go(
-      preferences.getBool('onboarded') ?? false ? '/login' : '/onboarding',
-    );
+    if (!(preferences.getBool('onboarded') ?? false)) {
+      context.go('/onboarding');
+      return;
+    }
+
+    // Firebase Auth는 앱 재실행 후에도 로그인 상태를 복원합니다. 이미 로그인한
+    // 사용자를 다시 로그인 화면으로 보내지 않고 저장된 여행 설정으로 복귀시킵니다.
+    if (FirebaseAuth.instance.currentUser != null) {
+      final travelPreferences = await TravelPreferencesRepository().load();
+      if (!mounted) return;
+      context.go(travelPreferences == null ? '/preferences' : '/home');
+      return;
+    }
+    context.go('/login');
   }
 
   @override

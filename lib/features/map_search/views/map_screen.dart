@@ -27,6 +27,9 @@ class MapScreen extends ConsumerStatefulWidget {
 class _MapScreenState extends ConsumerState<MapScreen> {
   final _mapController = fm.MapController();
   bool _locating = false;
+  bool _loadingRoadRoute = false;
+  List<ll.LatLng> _roadPoints = const [];
+  List<RouteGuideStep> _routeGuides = const [];
 
   @override
   void initState() {
@@ -45,8 +48,100 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             padding: const EdgeInsets.fromLTRB(48, 170, 48, 230),
           ),
         );
+        _loadRoadRoute(selected);
       }
     });
+  }
+
+  Future<void> _loadRoadRoute(SelectedRoute route) async {
+    setState(() => _loadingRoadRoute = true);
+    try {
+      final metrics = await ref
+          .read(courseRepositoryProvider)
+          .previewRoute(route.spots);
+      if (!mounted) return;
+      final roadPoints = metrics.path
+          .map((point) => ll.LatLng(point.latitude, point.longitude))
+          .toList();
+      setState(() {
+        _roadPoints = roadPoints;
+        _routeGuides = metrics.guides;
+      });
+      if (roadPoints.length > 1) {
+        _mapController.fitCamera(
+          fm.CameraFit.bounds(
+            bounds: fm.LatLngBounds.fromPoints(roadPoints),
+            padding: const EdgeInsets.fromLTRB(38, 155, 38, 265),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('실제 도로 경로를 불러오지 못해 경유지를 직선으로 표시해요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingRoadRoute = false);
+    }
+  }
+
+  void _showRouteGuides() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: FractionallySizedBox(
+          heightFactor: 0.72,
+          child: Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.alt_route_rounded, color: AppTheme.primary),
+                    SizedBox(width: 10),
+                    Text(
+                      '카카오 실시간 도로 안내',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _routeGuides.length,
+                  separatorBuilder: (_, _) => const Divider(height: 18),
+                  itemBuilder: (context, index) {
+                    final guide = _routeGuides[index];
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        backgroundColor: AppTheme.softMint,
+                        foregroundColor: AppTheme.primary,
+                        child: Text('${index + 1}'),
+                      ),
+                      title: Text(
+                        guide.instruction,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: guide.distanceMeters > 0
+                          ? Text(_formatGuideDistance(guide.distanceMeters))
+                          : null,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _search() =>
@@ -263,6 +358,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final points = places
         .map((place) => ll.LatLng(place.lat, place.lng))
         .toList();
+    final routePoints = _roadPoints.length > 1 ? _roadPoints : points;
 
     return Scaffold(
       body: Stack(
@@ -281,11 +377,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.techtour.flutterprojects',
                 ),
-                if (points.length > 1)
+                if (routePoints.length > 1)
                   fm.PolylineLayer(
                     polylines: [
                       fm.Polyline(
-                        points: points,
+                        points: routePoints,
                         color: AppTheme.primary,
                         strokeWidth: 5,
                       ),
@@ -463,6 +559,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         .start(selectedRoute),
                     onNavigate: _openNavigation,
                     onConfirm: _confirmArrival,
+                    loadingRoadRoute: _loadingRoadRoute,
+                    onShowGuides: _routeGuides.isEmpty
+                        ? null
+                        : _showRouteGuides,
                   ),
                 _RoutePreview(
                   places: places,
@@ -485,6 +585,8 @@ class _JourneyControlCard extends StatelessWidget {
     required this.onStart,
     required this.onNavigate,
     required this.onConfirm,
+    required this.loadingRoadRoute,
+    required this.onShowGuides,
   });
 
   final JourneyProgress? progress;
@@ -493,6 +595,8 @@ class _JourneyControlCard extends StatelessWidget {
   final VoidCallback onStart;
   final ValueChanged<CourseSpot> onNavigate;
   final ValueChanged<CourseSpot> onConfirm;
+  final bool loadingRoadRoute;
+  final VoidCallback? onShowGuides;
 
   @override
   Widget build(BuildContext context) {
@@ -526,7 +630,7 @@ class _JourneyControlCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        'GPS로 방문을 확인하며 순서대로 진행해요.',
+                        'GPS 방문 확인과 실제 도로 경로로 진행해요.',
                         style: TextStyle(color: Colors.white70, fontSize: 11),
                       ),
                     ],
@@ -576,6 +680,38 @@ class _JourneyControlCard extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
+                if (loadingRoadRoute) ...[
+                  const SizedBox(height: 8),
+                  const Row(
+                    children: [
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(width: 7),
+                      Text(
+                        '카카오 도로 경로 계산 중',
+                        style: TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ] else if (onShowGuides != null) ...[
+                  const SizedBox(height: 3),
+                  TextButton.icon(
+                    onPressed: onShowGuides,
+                    icon: const Icon(Icons.alt_route_rounded, size: 16),
+                    label: const Text('전체 도로 안내 보기'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -894,3 +1030,7 @@ class _CurrentLocationMarker extends StatelessWidget {
     ),
   );
 }
+
+String _formatGuideDistance(int meters) => meters >= 1000
+    ? '${(meters / 1000).toStringAsFixed(1)}km 이동'
+    : '${meters}m 이동';

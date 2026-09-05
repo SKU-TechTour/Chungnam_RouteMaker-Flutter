@@ -108,9 +108,30 @@ class CourseRepository {
       if (data == null) {
         throw const ApiException(message: 'Invalid route preview response');
       }
+      final routes = data['routes'] as List<dynamic>? ?? const [];
+      final path = routes
+          .expand(
+            (route) =>
+                ((route as Map<String, dynamic>)['path'] as List<dynamic>? ??
+                const []),
+          )
+          .whereType<Map<String, dynamic>>()
+          .map(RoutePathPoint.fromJson)
+          .toList();
+      final guides = routes
+          .expand(
+            (route) =>
+                ((route as Map<String, dynamic>)['guides'] as List<dynamic>? ??
+                const []),
+          )
+          .whereType<Map<String, dynamic>>()
+          .map(RouteGuideStep.fromJson)
+          .toList();
       return RouteMetrics(
         distanceMeters: (data['totalDistanceMeters'] as num?)?.round() ?? 0,
         durationSeconds: (data['totalDurationSeconds'] as num?)?.round() ?? 0,
+        path: path,
+        guides: guides,
       );
     } on DioException catch (e) {
       final error = e.error;

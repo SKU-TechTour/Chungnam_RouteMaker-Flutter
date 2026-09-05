@@ -9,6 +9,7 @@ import 'package:flutterprojects/features/saved/views/saved_screen.dart';
 import 'package:flutterprojects/features/my_history/views/my_history_screen.dart';
 import 'package:flutterprojects/features/my_history/views/receipt_share_screen.dart';
 import 'package:flutterprojects/features/my_history/views/stamp_history_screen.dart';
+import 'package:flutterprojects/features/my_history/views/stamp_share_preview_screen.dart';
 import 'package:flutterprojects/features/travel_preferences/views/travel_preferences_screen.dart';
 
 final appRouter = GoRouter(
@@ -46,6 +47,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/history/stamps',
       builder: (context, state) => const StampHistoryScreen(),
+    ),
+    GoRoute(
+      path: '/history/stamp-preview',
+      builder: (context, state) => const StampSharePreviewScreen(),
     ),
   ],
 );

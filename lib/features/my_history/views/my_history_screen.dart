@@ -191,9 +191,19 @@ class _MyHistoryScreenState extends ConsumerState<MyHistoryScreen> {
                           subtitle: '도장을 모아 충남 여행 지도를 완성해보세요.',
                         ),
                       ),
-                      TextButton(
-                        onPressed: () => context.push('/history/stamps'),
-                        child: const Text('전체 보기'),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextButton(
+                            onPressed: () =>
+                                context.push('/history/stamp-preview'),
+                            child: const Text('예시 보기'),
+                          ),
+                          TextButton(
+                            onPressed: () => context.push('/history/stamps'),
+                            child: const Text('전체'),
+                          ),
+                        ],
                       ),
                     ],
                   ),
