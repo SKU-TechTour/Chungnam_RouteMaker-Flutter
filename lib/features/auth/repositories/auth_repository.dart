@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/foundation.dart';
+import 'package:flutterprojects/core/network/dio_client.dart';
 import 'package:flutterprojects/features/auth/models/user_model.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -62,6 +64,14 @@ class AuthRepository {
   Future<void> deleteAccount() async {
     final user = _firebaseAuth.currentUser;
     if (user == null) return;
+
+    // Firebase 계정을 지우기 전에 인증 토큰이 필요한 Spring 사용자 데이터부터
+    // 삭제합니다. 아직 서버에 사용자 행이 만들어지지 않은 404만 정상으로 봅니다.
+    try {
+      await DioClient.instance.dio.delete<void>('/api/users/me');
+    } on DioException catch (error) {
+      if (error.response?.statusCode != 404) rethrow;
+    }
     await user.delete();
     if (!kIsWeb) {
       await GoogleSignIn.instance.signOut();
