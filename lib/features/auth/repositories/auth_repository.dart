@@ -9,7 +9,18 @@ class AuthRepository {
   AuthRepository({firebase_auth.FirebaseAuth? firebaseAuth})
     : _firebaseAuth = firebaseAuth ?? firebase_auth.FirebaseAuth.instance;
 
+  static const _googleWebClientId =
+      '283495436741-nsu9ijpmcuphi88eeugfu40a97s9sj7h.apps.googleusercontent.com';
+  static Future<void>? _googleSignInInitialization;
+
   final firebase_auth.FirebaseAuth _firebaseAuth;
+
+  Future<void> _ensureGoogleSignInInitialized() =>
+      _googleSignInInitialization ??= GoogleSignIn.instance.initialize(
+        // Android Credential Manager needs the Web OAuth client ID. Supplying
+        // it explicitly avoids relying on resource discovery in Play builds.
+        serverClientId: _googleWebClientId,
+      );
 
   Future<UserModel> loginWithGoogle() async {
     final firebase_auth.UserCredential credential;
@@ -19,7 +30,7 @@ class AuthRepository {
         firebase_auth.GoogleAuthProvider(),
       );
     } else {
-      await GoogleSignIn.instance.initialize();
+      await _ensureGoogleSignInInitialized();
       final googleUser = await GoogleSignIn.instance.authenticate();
       final googleAuth = googleUser.authentication;
       final firebaseCredential = firebase_auth.GoogleAuthProvider.credential(
