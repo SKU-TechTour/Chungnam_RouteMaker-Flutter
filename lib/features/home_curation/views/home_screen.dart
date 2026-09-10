@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/di/providers.dart';
@@ -22,6 +23,10 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  static const _publicDataNoticeHiddenUntilKey =
+      'public_data_notice_hidden_until';
+  static bool _noticeShownThisSession = false;
+
   var _regionIndex = 0;
   var _party = TravelParty.traveler;
   var _duration = TripDuration.dayTrip;
@@ -51,6 +56,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _previewMetrics = session.previewMetrics;
     }
     _loadPreferences();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showPublicDataNoticeIfNeeded();
+    });
+  }
+
+  Future<void> _showPublicDataNoticeIfNeeded() async {
+    if (_noticeShownThisSession || !mounted) return;
+    final preferences = await SharedPreferences.getInstance();
+    final hiddenUntil = DateTime.fromMillisecondsSinceEpoch(
+      preferences.getInt(_publicDataNoticeHiddenUntilKey) ?? 0,
+    );
+    if (DateTime.now().isBefore(hiddenUntil) || !mounted) return;
+    _noticeShownThisSession = true;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.info_outline_rounded, color: AppTheme.primary),
+        title: const Text(
+          '공공데이터 이용 안내',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        content: const Text(
+          '본 앱은 한국관광공사 TourAPI와 기상청 예보 등 공공데이터를 실시간으로 조합해 정보를 제공합니다. 기관의 갱신 시점과 현장 상황에 따라 운영시간, 날씨, 이동 정보가 실제와 다를 수 있으니 방문 전 공식 정보를 한 번 더 확인해주세요.',
+          style: TextStyle(height: 1.55),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await preferences.setInt(
+                _publicDataNoticeHiddenUntilKey,
+                DateTime.now()
+                    .add(const Duration(days: 1))
+                    .millisecondsSinceEpoch,
+              );
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+            },
+            child: const Text('1일간 보지 않기'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadPreferences() async {
@@ -80,6 +132,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     duration: _duration,
     routeTemplate: _routeTemplate,
   );
+
+  Future<void> _editPreferences() async {
+    final updated = await context.push<TravelPreferences>('/preferences');
+    if (!mounted || updated == null) return;
+    setState(() {
+      _party = updated.party;
+      _duration = updated.duration;
+      _routeTemplate = updated.routeTemplate;
+      _concepts = Set.of(updated.concepts);
+      _selectedVariant = 0;
+      _editableSpots = [];
+      _previewMetrics = null;
+    });
+    await _loadRegion();
+  }
 
   void _persistSession() {
     final preferences = _preferences;
@@ -317,13 +384,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       duration: _duration,
                       routeTemplate: _routeTemplate,
                       course: liveCourse,
-                      onEdit: () => context.push('/preferences'),
+                      onEdit: _editPreferences,
                     ),
                   ],
                   const SizedBox(height: 16),
                   _PreferenceSummary(
                     concepts: _concepts,
-                    onEdit: () => context.push('/preferences'),
+                    onEdit: _editPreferences,
                   ),
                   const SizedBox(height: 26),
                   if (curationState.errorMessage != null) ...[
@@ -366,6 +433,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         )
                       else
                         Container(
+                          constraints: const BoxConstraints(maxWidth: 150),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
                             vertical: 6,
@@ -374,9 +442,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             color: AppTheme.softMint,
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Text(
-                            '취향 일치 92%',
-                            style: TextStyle(
+                          child: Text(
+                            '${_concepts.map((concept) => concept.label).join(' · ')} 반영',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
                               color: AppTheme.primary,
                               fontSize: 11,
                               fontWeight: FontWeight.w900,
@@ -386,9 +457,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  if (liveCourse != null)
-                    _LiveCourseSource(course: liveCourse)
-                  else if (ApiConstants.useMockData)
+                  if (ApiConstants.useMockData)
                     _ConceptCatalog(combo: _combo, concepts: _concepts),
                   if (liveCourse == null && !ApiConstants.useMockData)
                     const _RealtimeWaitingCard(),
@@ -680,49 +749,6 @@ class _RegionSelector extends StatelessWidget {
   );
 }
 
-class _LiveCourseSource extends StatelessWidget {
-  const _LiveCourseSource({required this.course});
-
-  final Course course;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: AppTheme.softMint,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.12)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Icon(Icons.cloud_done_outlined, size: 18, color: AppTheme.primary),
-            SizedBox(width: 7),
-            Text(
-              '실시간 공공데이터 추천',
-              style: TextStyle(
-                color: AppTheme.primary,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '${course.title}\n관광지는 TourAPI, 날씨는 기상청, 이동시간은 카카오모빌리티 기준이에요.',
-          style: const TextStyle(
-            color: AppTheme.textSecondary,
-            fontSize: 12,
-            height: 1.45,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 class _ApiErrorBanner extends StatelessWidget {
   const _ApiErrorBanner({required this.message, required this.onRetry});
 
@@ -917,7 +943,7 @@ class _ComboStep extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'TourAPI 소개 보기',
+                        '소개보기',
                         style: TextStyle(
                           color: AppTheme.textSecondary,
                           fontSize: 11,
@@ -1076,11 +1102,15 @@ class _SpotDetailSheet extends StatelessWidget {
   final Future<Map<String, dynamic>?> details;
 
   String _plainText(String value) => value
+      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n')
       .replaceAll(RegExp(r'<[^>]*>'), '')
       .replaceAll('&nbsp;', ' ')
       .replaceAll('&amp;', '&')
       .replaceAll('&lt;', '<')
       .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
       .trim();
 
   @override
@@ -1152,6 +1182,9 @@ class _SpotDetailSheet extends StatelessWidget {
                   child: LinearProgressIndicator(minHeight: 3),
                 );
               }
+              if (snapshot.hasError) {
+                return const _DetailLoadError();
+              }
               final detail = snapshot.data;
               final overview = _plainText(detail?['overview'] as String? ?? '');
               final address = detail?['address'] as String? ?? spot?.address;
@@ -1165,7 +1198,7 @@ class _SpotDetailSheet extends StatelessWidget {
                   Text(
                     overview.isNotEmpty
                         ? overview
-                        : '한국관광공사 TourAPI에서 제공한 장소입니다.',
+                        : '한국관광공사 TourAPI 기본 정보에는 이 장소의 장문 소개가 제공되지 않았습니다. 아래 주소와 연락처 등 제공된 정보를 확인해주세요.',
                     style: const TextStyle(
                       color: AppTheme.textSecondary,
                       height: 1.55,
@@ -1255,6 +1288,32 @@ class _DetailInfoRow extends StatelessWidget {
         ),
       ),
     ],
+  );
+}
+
+class _DetailLoadError extends StatelessWidget {
+  const _DetailLoadError();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: AppTheme.coral.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: const Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.cloud_off_rounded, color: AppTheme.coral, size: 19),
+        SizedBox(width: 9),
+        Expanded(
+          child: Text(
+            'TourAPI 상세 소개를 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 소개보기를 다시 열어주세요.',
+            style: TextStyle(fontSize: 12, height: 1.45),
+          ),
+        ),
+      ],
+    ),
   );
 }
 

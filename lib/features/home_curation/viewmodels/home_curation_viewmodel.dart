@@ -55,15 +55,15 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
   String _messageFor(Object error) {
     if (error is ApiException) {
       if (error.statusCode == null) {
-        return '백엔드 서버에 연결할 수 없습니다. Spring 서버와 API 주소를 확인해주세요.';
+        return '실시간 코스 서버에 연결하지 못했습니다. 네트워크 확인 후 재시도해주세요.';
       }
       if (error.statusCode == 401 || error.statusCode == 403) {
-        return 'Firebase 인증 설정을 확인해주세요. (${error.statusCode})';
+        return '로그인 인증이 만료되었습니다. 앱을 다시 실행해주세요. (${error.statusCode})';
       }
       if (error.message.contains('환경변수')) {
         return '서버의 공공 API 환경변수가 등록되지 않았습니다.';
       }
-      return '실시간 코스 API 오류 (${error.statusCode}): ${error.message}';
+      return '실시간 코스를 불러오지 못했습니다. 잠시 후 다시 시도해주세요. (${error.statusCode})';
     }
     return '실시간 관광정보를 불러오지 못했습니다: $error';
   }

@@ -28,27 +28,36 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   final _mapController = fm.MapController();
   bool _locating = false;
   bool _loadingRoadRoute = false;
+  bool _usingFallbackTiles = false;
+  bool _mapInitialized = false;
+  bool _mapReady = false;
   List<ll.LatLng> _roadPoints = const [];
   List<RouteGuideStep> _routeGuides = const [];
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final selected = ref.read(selectedRouteProvider);
-      _moveToCurrentLocation(searchNearby: selected == null);
-      if (selected != null && selected.spots.length > 1) {
-        _mapController.fitCamera(
-          fm.CameraFit.bounds(
-            bounds: fm.LatLngBounds.fromPoints(
-              selected.spots
-                  .map((spot) => ll.LatLng(spot.latitude, spot.longitude))
-                  .toList(),
-            ),
-            padding: const EdgeInsets.fromLTRB(48, 170, 48, 230),
+  void _initializeMap() {
+    if (_mapInitialized || !mounted) return;
+    _mapInitialized = true;
+    setState(() => _mapReady = true);
+
+    final selected = ref.read(selectedRouteProvider);
+    if (selected != null && selected.spots.length > 1) {
+      _mapController.fitCamera(
+        fm.CameraFit.bounds(
+          bounds: fm.LatLngBounds.fromPoints(
+            selected.spots
+                .map((spot) => ll.LatLng(spot.latitude, spot.longitude))
+                .toList(),
           ),
-        );
-        _loadRoadRoute(selected);
+          padding: const EdgeInsets.fromLTRB(48, 170, 48, 230),
+        ),
+      );
+      _loadRoadRoute(selected);
+    }
+
+    // 지도가 먼저 그려진 뒤 위치 권한을 요청해 권한 창 뒤에 흰 화면이 남지 않게 합니다.
+    Future<void>.delayed(const Duration(milliseconds: 250), () {
+      if (mounted) {
+        _moveToCurrentLocation(searchNearby: selected == null);
       }
     });
   }
@@ -146,6 +155,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   Future<void> _search() =>
       ref.read(mapSearchViewModelProvider.notifier).searchNearby();
+
+  void _onTileError() {
+    if (_usingFallbackTiles || !mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_usingFallbackTiles) {
+        setState(() => _usingFallbackTiles = true);
+      }
+    });
+  }
 
   void _moveToRegion(String region) {
     final center = _regionCenters[region]!;
@@ -363,6 +381,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return Scaffold(
       body: Stack(
         children: [
+          const Positioned.fill(child: ColoredBox(color: Color(0xFFE5ECE7))),
           Positioned.fill(
             child: fm.FlutterMap(
               mapController: _mapController,
@@ -371,11 +390,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ? points.first
                     : const ll.LatLng(36.4465, 127.1191),
                 initialZoom: 12,
+                onMapReady: _initializeMap,
               ),
               children: [
                 fm.TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  fallbackUrl:
+                      'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.techtour.flutterprojects',
+                  errorTileCallback: (_, _, _) => _onTileError(),
+                  evictErrorTileStrategy:
+                      fm.EvictErrorTileStrategy.notVisibleRespectMargin,
                 ),
                 if (routePoints.length > 1)
                   fm.PolylineLayer(
@@ -410,9 +435,34 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       ),
                   ],
                 ),
+                const fm.SimpleAttributionWidget(
+                  source: Text(
+                    'OpenStreetMap contributors · CARTO',
+                    style: TextStyle(fontSize: 9),
+                  ),
+                ),
               ],
             ),
           ),
+          if (!_mapReady)
+            const Positioned.fill(
+              child: ColoredBox(
+                color: Color(0xFFF4F7F4),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 12),
+                      Text(
+                        '코스 지도를 준비하고 있어요.',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           SafeArea(
             child: Column(
               children: [
@@ -547,6 +597,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 if (state.errorMessage case final message?) ...[
                   const SizedBox(height: 10),
                   _ApiErrorBanner(message: message, onRetry: _search),
+                ],
+                if (_usingFallbackTiles) ...[
+                  const SizedBox(height: 8),
+                  const _MapNetworkNotice(),
                 ],
                 const Spacer(),
                 if (selectedRoute != null)
@@ -786,6 +840,36 @@ class _ApiErrorBanner extends StatelessWidget {
           ),
         ),
         TextButton(onPressed: onRetry, child: const Text('재시도')),
+      ],
+    ),
+  );
+}
+
+class _MapNetworkNotice extends StatelessWidget {
+  const _MapNetworkNotice();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.symmetric(horizontal: 16),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.94),
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10),
+      ],
+    ),
+    child: const Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.map_outlined, size: 16, color: AppTheme.primary),
+        SizedBox(width: 7),
+        Flexible(
+          child: Text(
+            '기본 지도 연결이 불안정해 대체 지도를 표시하고 있어요.',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+          ),
+        ),
       ],
     ),
   );

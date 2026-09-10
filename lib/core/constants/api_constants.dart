@@ -10,11 +10,13 @@ abstract final class ApiConstants {
     defaultValue: false,
   );
 
-  /// Override this with `--dart-define=API_BASE_URL=http://...` for a device.
-  /// Android emulators reach the development machine through 10.0.2.2.
+  /// Release/스토어 빌드는 별도 인자를 빠뜨려도 운영 서버에 연결합니다.
+  /// 로컬 서버로 디버깅할 때만 `--dart-define=API_BASE_URL=http://...`로
+  /// 덮어씁니다. Android 실기기는 adb reverse 후 localhost를 사용할 수 있습니다.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:8080',
+    defaultValue:
+        'https://port-0-chungnam-routemaker-spring-mtnrcg3t5c416fce.sel3.cloudtype.app',
   );
 
   // home_curation

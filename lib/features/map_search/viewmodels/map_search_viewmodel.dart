@@ -53,12 +53,12 @@ class MapSearchViewModel extends Notifier<MapSearchState> {
   String _messageFor(Object error) {
     if (error is ApiException) {
       if (error.statusCode == null) {
-        return '백엔드 서버에 연결할 수 없습니다. Spring 서버를 먼저 실행해주세요.';
+        return '실시간 관광 서버에 연결하지 못했습니다. 네트워크 확인 후 재시도해주세요.';
       }
       if (error.message.contains('환경변수')) {
         return '서버의 TOUR_API_SERVICE_KEY가 등록되지 않았습니다.';
       }
-      return 'TourAPI 조회 오류 (${error.statusCode}): ${error.message}';
+      return '주변 관광정보를 불러오지 못했습니다. 잠시 후 재시도해주세요. (${error.statusCode})';
     }
     return '실시간 관광정보를 불러오지 못했습니다: $error';
   }

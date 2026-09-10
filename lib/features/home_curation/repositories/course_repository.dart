@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutterprojects/core/network/api_exception.dart';
+import 'package:flutterprojects/core/network/dio_retry.dart';
 import 'package:flutterprojects/features/home_curation/models/course.dart';
 import 'package:flutterprojects/features/home_curation/models/selected_route.dart';
 
@@ -31,18 +32,43 @@ class CourseRepository {
     Set<String> concepts = const {},
     int variant = 0,
   }) async {
+    final requestData = {
+      'region': region,
+      'military': military,
+      'journeyType': journeyType,
+      'routeTemplate': routeTemplate,
+      'concepts': concepts.toList(),
+      'variant': variant,
+    };
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/api/courses/recommendations',
-        data: {
-          'region': region,
-          'military': military,
-          'journeyType': journeyType,
-          'routeTemplate': routeTemplate,
-          'concepts': concepts.toList(),
-          'variant': variant,
-        },
-      );
+      late final Response<Map<String, dynamic>> response;
+      try {
+        response = await retryTransientDio(
+          () => _dio.post<Map<String, dynamic>>(
+            '/api/courses/recommendations',
+            data: requestData,
+          ),
+        );
+      } on DioException catch (error) {
+        // 이전 서버 버전은 목록 경로만 인증 대상으로 설정되어 있었습니다.
+        // 인증 갱신 후에도 401/403이면 공개된 단일 실시간 추천 경로로 내려가
+        // 빈 홈 대신 최소 한 개의 실제 TourAPI 코스를 제공합니다.
+        if (error.response?.statusCode != 401 &&
+            error.response?.statusCode != 403) {
+          rethrow;
+        }
+        final fallback = await retryTransientDio(
+          () => _dio.post<Map<String, dynamic>>(
+            '/api/courses/recommend',
+            data: requestData,
+          ),
+        );
+        final fallbackData = fallback.data?['data'];
+        if (fallbackData is! Map<String, dynamic>) {
+          throw const ApiException(message: 'Invalid course response');
+        }
+        return [Course.fromJson(fallbackData)];
+      }
       final data = response.data?['data'] as List<dynamic>?;
       if (data == null) {
         throw const ApiException(message: 'Invalid course list response');
@@ -76,9 +102,11 @@ class CourseRepository {
 
   Future<Map<String, dynamic>?> fetchSpotDetails(String contentId) async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(
-        '/api/external/tour/common-info',
-        queryParameters: {'contentId': contentId},
+      final response = await retryTransientDio(
+        () => _dio.get<Map<String, dynamic>>(
+          '/api/external/tour/common-info',
+          queryParameters: {'contentId': contentId},
+        ),
       );
       return response.data?['data'] as Map<String, dynamic>?;
     } on DioException catch (e) {

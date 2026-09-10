@@ -29,16 +29,44 @@ class DioClient {
         ..interceptors.add(
           InterceptorsWrapper(
             onRequest: (options, handler) async {
-              if (Firebase.apps.isNotEmpty) {
-                final token = await FirebaseAuth.instance.currentUser
-                    ?.getIdToken();
-                if (token != null && token.isNotEmpty) {
-                  options.headers['Authorization'] = 'Bearer $token';
+              try {
+                if (Firebase.apps.isNotEmpty) {
+                  final token = await FirebaseAuth.instance.currentUser
+                      ?.getIdToken();
+                  if (token != null && token.isNotEmpty) {
+                    options.headers['Authorization'] = 'Bearer $token';
+                  }
                 }
+              } on FirebaseAuthException {
+                // 공개 조회 API는 토큰 갱신 장애가 있어도 호출할 수 있게 진행합니다.
+                // 인증이 필요한 API의 401은 onError에서 새 토큰으로 한 번 재시도합니다.
               }
               handler.next(options);
             },
-            onError: (error, handler) {
+            onError: (error, handler) async {
+              if (error.response?.statusCode == 401 &&
+                  error.requestOptions.extra['firebaseAuthRetried'] != true &&
+                  Firebase.apps.isNotEmpty &&
+                  FirebaseAuth.instance.currentUser != null) {
+                try {
+                  final token = await FirebaseAuth.instance.currentUser!
+                      .getIdToken(true);
+                  if (token != null && token.isNotEmpty) {
+                    final options = error.requestOptions;
+                    options.extra['firebaseAuthRetried'] = true;
+                    options.headers['Authorization'] = 'Bearer $token';
+                    final response = await DioClient.instance.dio.fetch(
+                      options,
+                    );
+                    handler.resolve(response);
+                    return;
+                  }
+                } on FirebaseAuthException {
+                  // 아래 공통 ApiException 변환으로 이어집니다.
+                } on DioException {
+                  // 재시도도 실패한 경우 최초 401을 일관된 오류로 전달합니다.
+                }
+              }
               final response = error.response;
               handler.reject(
                 DioException(

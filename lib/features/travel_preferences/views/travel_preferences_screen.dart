@@ -41,15 +41,19 @@ class _TravelPreferencesScreenState extends State<TravelPreferencesScreen> {
   Future<void> _continue() async {
     if (_party == null || _routeTemplate == null || _concepts.isEmpty) return;
     setState(() => _saving = true);
-    await _repository.save(
-      TravelPreferences(
-        party: _party!,
-        concepts: _concepts,
-        duration: _duration,
-        routeTemplate: _routeTemplate!,
-      ),
+    final updated = TravelPreferences(
+      party: _party!,
+      concepts: Set.unmodifiable(_concepts),
+      duration: _duration,
+      routeTemplate: _routeTemplate!,
     );
-    if (mounted) context.go('/home');
+    await _repository.save(updated);
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop(updated);
+    } else {
+      context.go('/home');
+    }
   }
 
   @override

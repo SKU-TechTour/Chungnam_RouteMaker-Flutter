@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "283495436741-8snchpkq6gdcfa3da1aqlgqneb7eke92.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.techtour.flutterprojects",
+            "certificate_hash": "06e734a859e9eba3f77a0bc9e8fdcc0453387a6d"
+          }
+        },
+        {
           "client_id": "283495436741-gg128u83jvg4eop70h7fcsh11dlpncho.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -35,6 +43,14 @@
           "android_info": {
             "package_name": "com.techtour.flutterprojects",
             "certificate_hash": "f2b551f08d12c89341fb485631de0b1eef9fc2bf"
+          }
+        },
+        {
+          "client_id": "283495436741-sl62elv1u795umfanspuumkv7b5fbif2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.techtour.flutterprojects",
+            "certificate_hash": "84abae71f63feab793a078ee1f7f0a7866052302"
           }
         },
         {
