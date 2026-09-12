@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutterprojects/core/constants/api_constants.dart';
 import 'package:flutterprojects/core/di/providers.dart';
 import 'package:flutterprojects/core/network/api_exception.dart';
+import 'package:flutterprojects/features/home_curation/models/course.dart';
 import 'package:flutterprojects/features/home_curation/viewmodels/home_curation_state.dart';
 
 /// [SB 화면 1] 카드 스와이프·Plan B 셔플 상태 관리 ViewModel.
@@ -9,6 +10,10 @@ import 'package:flutterprojects/features/home_curation/viewmodels/home_curation_
 /// View(home_screen) → 이벤트 전달
 /// Repository → 데이터 fetch
 class HomeCurationViewModel extends Notifier<HomeCurationState> {
+  final Map<String, List<Course>> _sessionCache = {};
+  final Map<String, Future<List<Course>>> _inFlight = {};
+  String? _latestRequestKey;
+
   @override
   HomeCurationState build() => const HomeCurationState();
 
@@ -18,11 +23,21 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
     String? journeyType,
     String? routeTemplate,
     Set<String> concepts = const {},
+    bool forceRefresh = false,
   }) async {
+    final cacheKey = _cacheKey(
+      region: region,
+      military: military,
+      journeyType: journeyType,
+      routeTemplate: routeTemplate,
+      concepts: concepts,
+    );
+    _latestRequestKey = cacheKey;
     state = state.copyWith(isLoading: true, clearError: true);
     final repository = ref.read(courseRepositoryProvider);
     if (ApiConstants.useMockData) {
       final courses = await repository.loadMockCourses(region: region);
+      if (_latestRequestKey != cacheKey) return;
       state = state.copyWith(
         courses: courses,
         currentIndex: 0,
@@ -32,24 +47,94 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
     }
     // 운영 모드에서는 반드시 Spring을 거쳐 실시간 API 경로를 사용합니다.
     try {
-      final courses = await repository.fetchCourses(
-        region: region,
-        military: military,
-        journeyType: journeyType,
-        routeTemplate: routeTemplate,
-        concepts: concepts,
-      );
+      if (forceRefresh) _sessionCache.remove(cacheKey);
+      final courses =
+          _sessionCache[cacheKey] ??
+          await _fetchOnce(
+            cacheKey,
+            () => repository.fetchCourses(
+              region: region,
+              military: military,
+              journeyType: journeyType,
+              routeTemplate: routeTemplate,
+              concepts: concepts,
+            ),
+          );
+      if (_latestRequestKey != cacheKey) return;
       state = state.copyWith(
         courses: courses,
         currentIndex: 0,
         isLoading: false,
       );
     } catch (error) {
+      if (_latestRequestKey != cacheKey) return;
       state = state.copyWith(
         isLoading: false,
         errorMessage: _messageFor(error),
       );
     }
+  }
+
+  /// 다른 지역으로 이동할 때 같은 공공데이터를 다시 호출하지 않도록 앱 실행
+  /// 세션 동안만 미리 받아 둡니다. 디스크나 서버 DB에는 저장하지 않습니다.
+  Future<void> prefetchCourses({
+    required String region,
+    bool military = false,
+    String? journeyType,
+    String? routeTemplate,
+    Set<String> concepts = const {},
+  }) async {
+    if (ApiConstants.useMockData) return;
+    final cacheKey = _cacheKey(
+      region: region,
+      military: military,
+      journeyType: journeyType,
+      routeTemplate: routeTemplate,
+      concepts: concepts,
+    );
+    if (_sessionCache.containsKey(cacheKey)) return;
+    final repository = ref.read(courseRepositoryProvider);
+    try {
+      await _fetchOnce(
+        cacheKey,
+        () => repository.fetchCourses(
+          region: region,
+          military: military,
+          journeyType: journeyType,
+          routeTemplate: routeTemplate,
+          concepts: concepts,
+        ),
+      );
+    } catch (_) {
+      // 사전 로딩 실패는 현재 화면을 깨뜨리지 않습니다. 해당 지역 진입 시
+      // 사용자가 재시도할 수 있도록 정상 로딩 흐름에 맡깁니다.
+    }
+  }
+
+  Future<List<Course>> _fetchOnce(
+    String cacheKey,
+    Future<List<Course>> Function() request,
+  ) {
+    final running = _inFlight[cacheKey];
+    if (running != null) return running;
+    final future = request().then((courses) {
+      _sessionCache[cacheKey] = List.unmodifiable(courses);
+      return courses;
+    });
+    _inFlight[cacheKey] = future;
+    return future.whenComplete(() => _inFlight.remove(cacheKey));
+  }
+
+  String _cacheKey({
+    required String region,
+    required bool military,
+    required String? journeyType,
+    required String? routeTemplate,
+    required Set<String> concepts,
+  }) {
+    final sortedConcepts = concepts.toList()..sort();
+    return '$region|$military|${journeyType ?? ''}|'
+        '${routeTemplate ?? ''}|${sortedConcepts.join(',')}';
   }
 
   String _messageFor(Object error) {

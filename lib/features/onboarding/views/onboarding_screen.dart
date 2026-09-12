@@ -17,28 +17,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   static const _items = [
     _OnboardingItem(
-      eyebrow: 'CURATED FOR YOU',
-      title: '하루가 가벼워지는\n세 곳의 조합',
-      description: '충남의 핵심 지역인 공주·부여·논산을 중심으로\n당신의 취향에 맞는 여행 큐레이션을 제공해요.',
+      eyebrow: 'CHUNGNAM, MADE FOR YOU',
+      title: '입영의 하루부터\n주말 여행까지',
+      description: '공주·부여·논산의 숨은 순간을\n당신의 상황과 취향에 맞춰 연결해요.',
       icon: Icons.auto_awesome_rounded,
       color: AppTheme.coral,
       background: AppTheme.softCoral,
+      callouts: ['논산 입영', '공주 역사', '부여 힐링'],
     ),
     _OnboardingItem(
-      eyebrow: 'SMART PLAN B',
-      title: '날씨가 바뀌어도\n여행은 멈추지 않게',
-      description: '비 오는 날에도 좋은 실내 코스를\n한 번의 탭으로 제안해요.',
+      eyebrow: 'LIVE CURATION',
+      title: '날씨와 취향을 읽는\n나만의 실시간 코스',
+      description: 'TourAPI 관광정보와 기상청 예보를 조합해\n지금 어울리는 여정을 제안해요.',
       icon: Icons.cloudy_snowing,
       color: Color(0xFF5B7CFA),
       background: Color(0xFFE8ECFF),
+      callouts: ['실시간 날씨', '취향별 추천', 'Plan B'],
     ),
     _OnboardingItem(
-      eyebrow: 'TRAVEL PASSPORT',
-      title: '걸어온 여행을\n나만의 기록으로',
-      description: '완주 스탬프와 영수증 카드로\n오늘의 여정을 간직하세요.',
+      eyebrow: 'PRIVATE TRAVEL PASSPORT',
+      title: '500m의 도착이\n여행 기록이 되는 순간',
+      description: 'GPS는 기기 안에서만 계산하고\n완주 스탬프와 영수증 카드로 남겨요.',
       icon: Icons.verified_user_rounded,
       color: AppTheme.accent,
       background: AppTheme.softMint,
+      callouts: ['기기 내 GPS', '완주 스탬프', '공유 카드'],
     ),
   ];
 
@@ -131,6 +134,7 @@ class _OnboardingItem {
     required this.icon,
     required this.color,
     required this.background,
+    required this.callouts,
   });
 
   final String eyebrow;
@@ -139,6 +143,7 @@ class _OnboardingItem {
   final IconData icon;
   final Color color;
   final Color background;
+  final List<String> callouts;
 }
 
 class _OnboardingPage extends StatelessWidget {
@@ -159,8 +164,13 @@ class _OnboardingPage extends StatelessWidget {
               height: illustrationHeight,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: item.background,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [item.background, Colors.white],
+                ),
                 borderRadius: BorderRadius.circular(36),
+                border: Border.all(color: item.color.withValues(alpha: 0.12)),
               ),
               child: Stack(
                 alignment: Alignment.center,
@@ -183,6 +193,50 @@ class _OnboardingPage extends StatelessWidget {
                     bottom: 30,
                     right: 34,
                     child: _Dot(color: item.color, small: true),
+                  ),
+                  Positioned(
+                    left: 18,
+                    right: 18,
+                    bottom: 18,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: item.callouts
+                          .map(
+                            (label) => Flexible(
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 3,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 7,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.92),
+                                  borderRadius: BorderRadius.circular(999),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: item.color.withValues(alpha: 0.1),
+                                      blurRadius: 10,
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: item.color,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
                   ),
                 ],
               ),

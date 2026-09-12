@@ -14,8 +14,10 @@ void main() {
 
     expect(find.text('개인정보 수집·이용 요약'), findsOneWidget);
     expect(find.text('[필수] 개인정보 수집·이용 동의'), findsOneWidget);
-    expect(find.byType(Checkbox), findsNWidgets(2));
+    expect(find.text('[필수] 전체 동의'), findsOneWidget);
+    expect(find.byType(Checkbox), findsNWidgets(3));
 
+    await tester.ensureVisible(find.text('Google로 계속하기'));
     await tester.tap(find.text('Google로 계속하기'));
     await tester.pumpAndSettle();
 

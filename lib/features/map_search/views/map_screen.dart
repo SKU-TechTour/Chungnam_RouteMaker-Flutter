@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' as fm;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,12 +33,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool _usingFallbackTiles = false;
   bool _mapInitialized = false;
   bool _mapReady = false;
+  Timer? _mapReadyTimer;
   List<ll.LatLng> _roadPoints = const [];
   List<RouteGuideStep> _routeGuides = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    // 일부 제조사 WebView/GPU 환경에서 onMapReady 콜백이 늦어져도 로딩
+    // 덮개가 영구적으로 화면을 가리지 않게 합니다.
+    _mapReadyTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted && !_mapReady) setState(() => _mapReady = true);
+    });
+  }
 
   void _initializeMap() {
     if (_mapInitialized || !mounted) return;
     _mapInitialized = true;
+    _mapReadyTimer?.cancel();
     setState(() => _mapReady = true);
 
     final selected = ref.read(selectedRouteProvider);
@@ -60,6 +74,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         _moveToCurrentLocation(searchNearby: selected == null);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _mapReadyTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadRoadRoute(SelectedRoute route) async {

@@ -274,6 +274,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 const _PrivacyCollectionSummary(),
                                 const SizedBox(height: 8),
                                 _ConsentRow(
+                                  value: _termsAgreed && _privacyAgreed,
+                                  label: '[필수] 전체 동의',
+                                  onChanged: _consentLoaded
+                                      ? (value) => setState(() {
+                                          _termsAgreed = value;
+                                          _privacyAgreed = value;
+                                        })
+                                      : null,
+                                  emphasized: true,
+                                ),
+                                const Divider(height: 1),
+                                _ConsentRow(
                                   value: _termsAgreed,
                                   label: '[필수] 서비스 이용약관 동의',
                                   onChanged: _consentLoaded
@@ -419,13 +431,15 @@ class _ConsentRow extends StatelessWidget {
     required this.value,
     required this.label,
     required this.onChanged,
-    required this.onDetails,
+    this.onDetails,
+    this.emphasized = false,
   });
 
   final bool value;
   final String label;
   final ValueChanged<bool>? onChanged;
-  final VoidCallback onDetails;
+  final VoidCallback? onDetails;
+  final bool emphasized;
 
   @override
   Widget build(BuildContext context) => Row(
@@ -449,23 +463,24 @@ class _ConsentRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppTheme.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontSize: emphasized ? 13 : 12,
+                fontWeight: emphasized ? FontWeight.w900 : FontWeight.w700,
               ),
             ),
           ),
         ),
       ),
-      TextButton(
-        onPressed: onDetails,
-        style: TextButton.styleFrom(
-          visualDensity: VisualDensity.compact,
-          padding: const EdgeInsets.symmetric(horizontal: 6),
+      if (onDetails != null)
+        TextButton(
+          onPressed: onDetails,
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+          ),
+          child: const Text('상세보기', style: TextStyle(fontSize: 11)),
         ),
-        child: const Text('상세보기', style: TextStyle(fontSize: 11)),
-      ),
     ],
   );
 }

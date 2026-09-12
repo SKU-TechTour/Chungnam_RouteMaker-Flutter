@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -26,6 +28,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   static const _publicDataNoticeHiddenUntilKey =
       'public_data_notice_hidden_until';
   static bool _noticeShownThisSession = false;
+  static bool _initialLoadingShownThisSession = false;
 
   var _regionIndex = 0;
   var _party = TravelParty.traveler;
@@ -36,6 +39,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   var _selectedVariant = 0;
   RouteMetrics? _previewMetrics;
   bool _routeUpdating = false;
+  int _loadGeneration = 0;
 
   final _preferencesRepository = TravelPreferencesRepository();
 
@@ -55,10 +59,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _selectedVariant = session.selectedVariant;
       _previewMetrics = session.previewMetrics;
     }
-    _loadPreferences();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showPublicDataNoticeIfNeeded();
+      _initializeHome();
     });
+  }
+
+  Future<void> _initializeHome() async {
+    await _showPublicDataNoticeIfNeeded();
+    if (!mounted) return;
+    await _loadPreferences(showInitialLoading: true);
   }
 
   Future<void> _showPublicDataNoticeIfNeeded() async {
@@ -105,7 +114,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Future<void> _loadPreferences() async {
+  Future<void> _loadPreferences({bool showInitialLoading = false}) async {
     final preferences = await _preferencesRepository.load();
     if (!mounted) return;
     if (preferences != null) {
@@ -123,7 +132,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 travelPreferenceSignature(preferences))) {
       return;
     }
-    await _loadRegion();
+    if (showInitialLoading && !_initialLoadingShownThisSession) {
+      _initialLoadingShownThisSession = true;
+      await _loadWithInitialDialog();
+    } else {
+      await _loadRegion();
+    }
+  }
+
+  Future<void> _loadWithInitialDialog() async {
+    var dialogOpen = true;
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const PopScope(
+          canPop: false,
+          child: AlertDialog(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+                SizedBox(width: 18),
+                Expanded(
+                  child: Text(
+                    '실시간 여행 정보를\n불러오고 있어요.',
+                    style: TextStyle(fontWeight: FontWeight.w800, height: 1.45),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ).whenComplete(() => dialogOpen = false),
+    );
+    await Future<void>.delayed(Duration.zero);
+    try {
+      await _loadRegion();
+    } finally {
+      if (mounted && dialogOpen) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
   }
 
   TravelPreferences get _preferences => TravelPreferences(
@@ -160,7 +213,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Future<void> _loadRegion() async {
+  Future<void> _loadRegion({bool forceRefresh = false}) async {
+    final generation = ++_loadGeneration;
     final nonsanTemplate = _combo.code == 'NONSAN'
         ? _routeTemplate
         : RouteTemplate.travelerFlexible;
@@ -172,10 +226,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           journeyType: _party.name,
           routeTemplate: nonsanTemplate.apiCode,
           concepts: _concepts.map((concept) => concept.name).toSet(),
+          forceRefresh: forceRefresh,
         );
-    if (!mounted) return;
+    if (!mounted || generation != _loadGeneration) return;
     final courses = ref.read(homeCurationViewModelProvider).courses;
     if (courses.isNotEmpty) _applyVariant(0, courses);
+    _prefetchOtherRegions();
+  }
+
+  void _prefetchOtherRegions() {
+    unawaited(_prefetchOtherRegionsSequentially());
+  }
+
+  Future<void> _prefetchOtherRegionsSequentially() async {
+    final concepts = _concepts.map((concept) => concept.name).toSet();
+    for (final combo in _combos.where((item) => item.code != _combo.code)) {
+      await ref
+          .read(homeCurationViewModelProvider.notifier)
+          .prefetchCourses(
+            region: combo.code,
+            military: combo.code == 'NONSAN' && _party != TravelParty.traveler,
+            journeyType: _party.name,
+            routeTemplate: combo.code == 'NONSAN'
+                ? _routeTemplate.apiCode
+                : RouteTemplate.travelerFlexible.apiCode,
+            concepts: concepts,
+          );
+    }
   }
 
   void _selectRegion(int index) {
@@ -396,7 +473,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   if (curationState.errorMessage != null) ...[
                     _ApiErrorBanner(
                       message: curationState.errorMessage!,
-                      onRetry: _loadRegion,
+                      onRetry: () => _loadRegion(forceRefresh: true),
                     ),
                     const SizedBox(height: 16),
                   ],
