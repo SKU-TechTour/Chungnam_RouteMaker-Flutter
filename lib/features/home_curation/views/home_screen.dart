@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -142,40 +143,66 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _loadWithInitialDialog() async {
     var dialogOpen = true;
-    unawaited(
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const PopScope(
-          canPop: false,
-          child: AlertDialog(
-            content: Row(
-              children: [
-                SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
-                ),
-                SizedBox(width: 18),
-                Expanded(
-                  child: Text(
-                    '실시간 여행 정보를\n불러오고 있어요.',
-                    style: TextStyle(fontWeight: FontWeight.w800, height: 1.45),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ).whenComplete(() => dialogOpen = false),
+    final progress = ValueNotifier<_InitialLoadProgress>(
+      const _InitialLoadProgress(
+        value: 0.08,
+        message: '사용자에게 알맞은 정보를 불러오는 중입니다.',
+      ),
     );
+    final dialogFuture = showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: _InitialLoadDialog(progress: progress),
+      ),
+    ).whenComplete(() => dialogOpen = false);
+    final timer = Timer.periodic(const Duration(milliseconds: 280), (_) {
+      final current = progress.value.value;
+      if (current >= 0.9) return;
+      final next = (current + 0.035).clamp(0.0, 0.9);
+      progress.value = _InitialLoadProgress(
+        value: next,
+        message: next < 0.38
+            ? '사용자에게 알맞은 정보를 불러오는 중입니다.'
+            : next < 0.72
+            ? '지역별 날씨를 불러오는 중입니다.'
+            : '추천 코스를 정리하고 있습니다.',
+      );
+    });
     await Future<void>.delayed(Duration.zero);
     try {
       await _loadRegion();
+      final state = ref.read(homeCurationViewModelProvider);
+      if (state.errorMessage == null && state.courses.isNotEmpty) {
+        final allRegionsLoaded = await _prefetchOtherRegionsSequentially();
+        if (allRegionsLoaded) {
+          progress.value = const _InitialLoadProgress(
+            value: 1,
+            message: '여행 준비가 완료되었습니다.',
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 450));
+        } else {
+          progress.value = _InitialLoadProgress(
+            value: progress.value.value,
+            message: '일부 지역 연결이 지연되고 있어요. 화면에서 다시 시도해주세요.',
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 700));
+        }
+      } else {
+        progress.value = _InitialLoadProgress(
+          value: progress.value.value,
+          message: '연결이 지연되고 있어요. 화면에서 다시 시도해주세요.',
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 700));
+      }
     } finally {
+      timer.cancel();
       if (mounted && dialogOpen) {
         Navigator.of(context, rootNavigator: true).pop();
       }
+      await dialogFuture;
+      progress.dispose();
     }
   }
 
@@ -199,6 +226,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _previewMetrics = null;
     });
     await _loadRegion();
+    _prefetchOtherRegions();
   }
 
   void _persistSession() {
@@ -231,17 +259,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!mounted || generation != _loadGeneration) return;
     final courses = ref.read(homeCurationViewModelProvider).courses;
     if (courses.isNotEmpty) _applyVariant(0, courses);
-    _prefetchOtherRegions();
   }
 
   void _prefetchOtherRegions() {
     unawaited(_prefetchOtherRegionsSequentially());
   }
 
-  Future<void> _prefetchOtherRegionsSequentially() async {
+  Future<bool> _prefetchOtherRegionsSequentially() async {
     final concepts = _concepts.map((concept) => concept.name).toSet();
+    var allLoaded = true;
     for (final combo in _combos.where((item) => item.code != _combo.code)) {
-      await ref
+      final loaded = await ref
           .read(homeCurationViewModelProvider.notifier)
           .prefetchCourses(
             region: combo.code,
@@ -252,7 +280,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 : RouteTemplate.travelerFlexible.apiCode,
             concepts: concepts,
           );
+      allLoaded = allLoaded && loaded;
     }
+    return allLoaded;
   }
 
   void _selectRegion(int index) {
@@ -1704,4 +1734,93 @@ class _ConceptCatalog extends StatelessWidget {
       ),
     );
   }
+}
+
+class _InitialLoadProgress {
+  const _InitialLoadProgress({required this.value, required this.message});
+
+  final double value;
+  final String message;
+}
+
+class _InitialLoadDialog extends StatelessWidget {
+  const _InitialLoadDialog({required this.progress});
+
+  final ValueListenable<_InitialLoadProgress> progress;
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+    contentPadding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
+    content: ValueListenableBuilder<_InitialLoadProgress>(
+      valueListenable: progress,
+      builder: (context, state, _) {
+        final percent = (state.value * 100).round();
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.softMint,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.route_rounded,
+                    color: AppTheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 13),
+                const Expanded(
+                  child: Text(
+                    '나만의 충남 루트 준비 중',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            Text(
+              state.message,
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: state.value),
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, _) => LinearProgressIndicator(
+                value: value,
+                minHeight: 9,
+                borderRadius: BorderRadius.circular(99),
+                backgroundColor: AppTheme.divider,
+                color: state.value >= 1 ? AppTheme.accent : AppTheme.primary,
+              ),
+            ),
+            const SizedBox(height: 9),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '$percent%',
+                style: TextStyle(
+                  color: state.value >= 1 ? AppTheme.accent : AppTheme.primary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }

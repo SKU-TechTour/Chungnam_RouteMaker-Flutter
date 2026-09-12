@@ -77,14 +77,14 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
 
   /// 다른 지역으로 이동할 때 같은 공공데이터를 다시 호출하지 않도록 앱 실행
   /// 세션 동안만 미리 받아 둡니다. 디스크나 서버 DB에는 저장하지 않습니다.
-  Future<void> prefetchCourses({
+  Future<bool> prefetchCourses({
     required String region,
     bool military = false,
     String? journeyType,
     String? routeTemplate,
     Set<String> concepts = const {},
   }) async {
-    if (ApiConstants.useMockData) return;
+    if (ApiConstants.useMockData) return true;
     final cacheKey = _cacheKey(
       region: region,
       military: military,
@@ -92,7 +92,7 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
       routeTemplate: routeTemplate,
       concepts: concepts,
     );
-    if (_sessionCache.containsKey(cacheKey)) return;
+    if (_sessionCache.containsKey(cacheKey)) return true;
     final repository = ref.read(courseRepositoryProvider);
     try {
       await _fetchOnce(
@@ -105,9 +105,11 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
           concepts: concepts,
         ),
       );
+      return true;
     } catch (_) {
       // 사전 로딩 실패는 현재 화면을 깨뜨리지 않습니다. 해당 지역 진입 시
       // 사용자가 재시도할 수 있도록 정상 로딩 흐름에 맡깁니다.
+      return false;
     }
   }
 
