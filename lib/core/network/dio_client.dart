@@ -29,6 +29,10 @@ class DioClient {
         ..interceptors.add(
           InterceptorsWrapper(
             onRequest: (options, handler) async {
+              if (options.extra['skipFirebaseAuth'] == true) {
+                handler.next(options);
+                return;
+              }
               try {
                 if (Firebase.apps.isNotEmpty) {
                   final token = await FirebaseAuth.instance.currentUser
@@ -45,6 +49,7 @@ class DioClient {
             },
             onError: (error, handler) async {
               if (error.response?.statusCode == 401 &&
+                  error.requestOptions.extra['skipFirebaseAuth'] != true &&
                   error.requestOptions.extra['firebaseAuthRetried'] != true &&
                   Firebase.apps.isNotEmpty &&
                   FirebaseAuth.instance.currentUser != null) {

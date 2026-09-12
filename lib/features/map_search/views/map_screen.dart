@@ -394,9 +394,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
               children: [
                 fm.TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  fallbackUrl:
-                      'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+                  key: ValueKey(_usingFallbackTiles),
+                  urlTemplate: _usingFallbackTiles
+                      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
+                      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  fallbackUrl: _usingFallbackTiles
+                      ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+                      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.techtour.flutterprojects',
                   errorTileCallback: (_, _, _) => _onTileError(),
                   evictErrorTileStrategy:

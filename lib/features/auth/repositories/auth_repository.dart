@@ -7,13 +7,16 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthRepository {
   AuthRepository({firebase_auth.FirebaseAuth? firebaseAuth})
-    : _firebaseAuth = firebaseAuth ?? firebase_auth.FirebaseAuth.instance;
+    : _firebaseAuthOverride = firebaseAuth;
 
   static const _googleWebClientId =
       '283495436741-nsu9ijpmcuphi88eeugfu40a97s9sj7h.apps.googleusercontent.com';
   static Future<void>? _googleSignInInitialization;
 
-  final firebase_auth.FirebaseAuth _firebaseAuth;
+  final firebase_auth.FirebaseAuth? _firebaseAuthOverride;
+
+  firebase_auth.FirebaseAuth get _firebaseAuth =>
+      _firebaseAuthOverride ?? firebase_auth.FirebaseAuth.instance;
 
   Future<void> _ensureGoogleSignInInitialized() =>
       _googleSignInInitialization ??= GoogleSignIn.instance.initialize(
@@ -98,7 +101,6 @@ class AuthRepository {
       id: user.uid,
       name: user.displayName ?? (user.isAnonymous ? '여행자' : '사용자'),
       email: user.email ?? '',
-      profileImage: user.photoURL,
       isAnonymous: user.isAnonymous,
     );
   }

@@ -47,6 +47,7 @@ class CourseRepository {
           () => _dio.post<Map<String, dynamic>>(
             '/api/courses/recommendations',
             data: requestData,
+            options: Options(extra: {'skipFirebaseAuth': true}),
           ),
         );
       } on DioException catch (error) {
@@ -61,6 +62,7 @@ class CourseRepository {
           () => _dio.post<Map<String, dynamic>>(
             '/api/courses/recommend',
             data: requestData,
+            options: Options(extra: {'skipFirebaseAuth': true}),
           ),
         );
         final fallbackData = fallback.data?['data'];
@@ -87,6 +89,7 @@ class CourseRepository {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/api/courses/$courseId/shuffle',
+        options: Options(extra: {'skipFirebaseAuth': true}),
       );
       final data = response.data?['data'];
       if (data is! Map<String, dynamic>) {
@@ -131,6 +134,7 @@ class CourseRepository {
               )
               .toList(),
         },
+        options: Options(extra: {'skipFirebaseAuth': true}),
       );
       final data = response.data?['data'] as Map<String, dynamic>?;
       if (data == null) {

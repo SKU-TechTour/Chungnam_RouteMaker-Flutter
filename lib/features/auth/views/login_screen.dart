@@ -16,7 +16,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  static const _consentVersion = '2026-09-10';
+  static const _consentVersion = '2026-09-12';
   static const _termsConsentKey = 'terms_consent_v1';
   static const _privacyConsentKey = 'privacy_consent_v1';
   static const _consentVersionKey = 'legal_consent_version';
@@ -63,13 +63,70 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _signIn(Future<bool> Function() action) async {
     if (!_allRequiredAgreed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('필수 약관과 개인정보 수집·이용에 동의해주세요.')),
-      );
-      return;
+      final accepted = await _requestRequiredConsent();
+      if (!accepted || !mounted) return;
     }
     await _persistConsent();
     if (await action() && mounted) context.go('/preferences');
+  }
+
+  Future<bool> _requestRequiredConsent() async {
+    var termsAgreed = _termsAgreed;
+    var privacyAgreed = _privacyAgreed;
+    final accepted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text(
+            '필수 동의 항목을 확인해주세요',
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _PrivacyCollectionSummary(),
+                const SizedBox(height: 12),
+                _ConsentRow(
+                  value: termsAgreed,
+                  label: '[필수] 서비스 이용약관 동의',
+                  onChanged: (value) =>
+                      setDialogState(() => termsAgreed = value),
+                  onDetails: () => _showLegalDetails(privacy: false),
+                ),
+                _ConsentRow(
+                  value: privacyAgreed,
+                  label: '[필수] 개인정보 수집·이용 동의',
+                  onChanged: (value) =>
+                      setDialogState(() => privacyAgreed = value),
+                  onDetails: () => _showLegalDetails(privacy: true),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: termsAgreed && privacyAgreed
+                  ? () => Navigator.pop(dialogContext, true)
+                  : null,
+              child: const Text('동의하고 계속'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (accepted != true || !mounted) return false;
+    setState(() {
+      _termsAgreed = true;
+      _privacyAgreed = true;
+    });
+    return true;
   }
 
   void _showLegalDetails({required bool privacy}) {
@@ -213,7 +270,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     color: AppTheme.textPrimary,
                                   ),
                                 ),
-                                const SizedBox(height: 15),
+                                const SizedBox(height: 12),
+                                const _PrivacyCollectionSummary(),
+                                const SizedBox(height: 8),
+                                _ConsentRow(
+                                  value: _termsAgreed,
+                                  label: '[필수] 서비스 이용약관 동의',
+                                  onChanged: _consentLoaded
+                                      ? (value) =>
+                                            setState(() => _termsAgreed = value)
+                                      : null,
+                                  onDetails: () =>
+                                      _showLegalDetails(privacy: false),
+                                ),
+                                _ConsentRow(
+                                  value: _privacyAgreed,
+                                  label: '[필수] 개인정보 수집·이용 동의',
+                                  onChanged: _consentLoaded
+                                      ? (value) => setState(
+                                          () => _privacyAgreed = value,
+                                        )
+                                      : null,
+                                  onDetails: () =>
+                                      _showLegalDetails(privacy: true),
+                                ),
+                                const Padding(
+                                  padding: EdgeInsets.fromLTRB(4, 2, 4, 10),
+                                  child: Text(
+                                    '필수 동의 전에는 Google 로그인과 게스트 계정 생성이 진행되지 않습니다.',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: AppTheme.textSecondary,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
                                 _SocialButton(
                                   label: 'Google로 계속하기',
                                   icon: Image.asset(
@@ -221,14 +312,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     width: 20,
                                     height: 20,
                                   ),
-                                  onTap: loading || !_allRequiredAgreed
+                                  onTap: loading
                                       ? null
                                       : () =>
                                             _signIn(viewModel.loginWithGoogle),
                                 ),
                                 const SizedBox(height: 8),
                                 TextButton.icon(
-                                  onPressed: loading || !_allRequiredAgreed
+                                  onPressed: loading
                                       ? null
                                       : () =>
                                             _signIn(viewModel.continueAsGuest),
@@ -267,39 +358,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       ),
                                     ),
                                   ),
-                                const SizedBox(height: 8),
-                                _ConsentRow(
-                                  value: _termsAgreed,
-                                  label: '[필수] 서비스 이용약관 동의',
-                                  onChanged: _consentLoaded
-                                      ? (value) =>
-                                            setState(() => _termsAgreed = value)
-                                      : null,
-                                  onDetails: () =>
-                                      _showLegalDetails(privacy: false),
-                                ),
-                                _ConsentRow(
-                                  value: _privacyAgreed,
-                                  label: '[필수] 개인정보 수집·이용 동의',
-                                  onChanged: _consentLoaded
-                                      ? (value) => setState(
-                                          () => _privacyAgreed = value,
-                                        )
-                                      : null,
-                                  onDetails: () =>
-                                      _showLegalDetails(privacy: true),
-                                ),
-                                const Padding(
-                                  padding: EdgeInsets.fromLTRB(4, 5, 4, 0),
-                                  child: Text(
-                                    '각 상세 내용을 확인한 뒤 동의해주세요. 필수 동의 전에는 로그인 및 게스트 이용이 시작되지 않습니다.',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: AppTheme.textSecondary,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ),
                               ],
                             ),
                           ),
@@ -315,6 +373,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
+}
+
+class _PrivacyCollectionSummary extends StatelessWidget {
+  const _PrivacyCollectionSummary();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: AppTheme.softMint,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.18)),
+    ),
+    child: const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '개인정보 수집·이용 요약',
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        SizedBox(height: 6),
+        Text(
+          '• 항목: Firebase UID, 이메일·표시 이름(Google 로그인)\n'
+          '• 목적: 본인 인증, 찜·완주 기록 제공\n'
+          '• 보유: 회원 탈퇴 시까지(탈퇴 시 삭제)\n'
+          '• GPS: 기기 내 거리 계산에만 사용하며 서버에 전송·저장하지 않음',
+          style: TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 10.5,
+            height: 1.5,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ConsentRow extends StatelessWidget {
@@ -423,9 +520,9 @@ const _privacyNotice = '''시행일: 2026년 9월 10일
 충남 루트메이커는 서비스 제공을 위해 아래와 같이 개인정보를 수집·이용합니다.
 
 1. 수집 항목
-• Google 로그인: Firebase 사용자 식별값(UID), 이메일 주소, 표시 이름, 프로필 사진 URL
+• Google 로그인: Firebase 사용자 식별값(UID), 이메일 주소, 표시 이름
 • 게스트 이용: Firebase 익명 사용자 식별값(UID)
-• 공통: 사용자가 직접 선택한 여행 지역, 동행 유형, 관심사와 코스 설정
+• 공통: 사용자가 직접 선택한 여행 지역, 동행 유형, 관심사와 코스 설정(추천 응답 생성 시에만 일시 처리하며 서버 DB에 저장하지 않음)
 
 2. 수집·이용 목적
 • 사용자 인증 및 계정 구분

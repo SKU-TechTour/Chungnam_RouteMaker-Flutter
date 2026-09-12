@@ -34,6 +34,7 @@ class PlaceRepository {
         () => _dio.get<Map<String, dynamic>>(
           ApiConstants.places,
           queryParameters: request.toQueryParameters(),
+          options: Options(extra: {'skipFirebaseAuth': true}),
         ),
       );
       final list = response.data?['data'] as List<dynamic>? ?? [];
