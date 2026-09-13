@@ -81,6 +81,7 @@ flutter:
     - assets/images/
     - assets/images/auth/
     - assets/images/brand/
+    - assets/images/onboarding/
     - assets/mock/
 
   fonts:

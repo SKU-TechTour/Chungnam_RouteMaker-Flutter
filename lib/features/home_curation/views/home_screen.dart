@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/di/providers.dart';
@@ -135,18 +138,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _initialLoadingShownThisSession = true;
       await _loadWithInitialDialog();
     } else {
-      await _loadRegion();
+      await _loadRegionWithDelayedDialog();
     }
   }
 
   Future<void> _loadWithInitialDialog() async {
-    var dialogOpen = true;
+    await _loadRegionWithDelayedDialog();
+  }
+
+  Future<bool> _loadRegionWithDelayedDialog({
+    bool forceRefresh = false,
+  }) async {
     final progress = ValueNotifier<_InitialLoadProgress>(
       const _InitialLoadProgress(
-        value: 0.08,
-        message: '사용자에게 알맞은 정보를 불러오는 중입니다.',
+        value: 0.22,
+        message: 'TourAPI로부터 여행 정보를 불러오는 중입니다.',
       ),
     );
+    final loadFuture = _loadRegion(forceRefresh: forceRefresh);
+    final completedWithinOneSecond = await Future.any<bool>([
+      loadFuture.then((_) => true),
+      Future<bool>.delayed(const Duration(seconds: 1), () => false),
+    ]);
+
+    if (completedWithinOneSecond || !mounted) {
+      final loaded = await loadFuture;
+      progress.dispose();
+      return loaded;
+    }
+
+    var dialogOpen = true;
     final dialogFuture = showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -155,56 +176,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: _InitialLoadDialog(progress: progress),
       ),
     ).whenComplete(() => dialogOpen = false);
-    await Future<void>.delayed(Duration.zero);
+    final stageTimer = Timer(const Duration(milliseconds: 1400), () {
+      progress.value = const _InitialLoadProgress(
+        value: 0.62,
+        message: '날씨와 이동 정보를 함께 확인하는 중입니다.',
+      );
+    });
     try {
-      progress.value = const _InitialLoadProgress(
-        value: 0.15,
-        message: '여행 서버 연결을 확인하고 있습니다.',
-      );
-      final serverHealthy = await ref
-          .read(courseRepositoryProvider)
-          .isServerHealthy();
-      if (!serverHealthy) {
-        progress.value = const _InitialLoadProgress(
-          value: 0.15,
-          message: '여행 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.',
-          failed: true,
-        );
-        await Future<void>.delayed(const Duration(milliseconds: 1100));
-        return;
-      }
-
-      progress.value = const _InitialLoadProgress(
-        value: 0.35,
-        message: '사용자에게 알맞은 관광정보를 불러오는 중입니다.',
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 120));
-      progress.value = const _InitialLoadProgress(
-        value: 0.55,
-        message: '지역별 날씨와 이동 정보를 불러오는 중입니다.',
-      );
-      final loaded = await _loadRegion();
+      final loaded = await loadFuture;
+      stageTimer.cancel();
       if (!loaded) {
         progress.value = const _InitialLoadProgress(
-          value: 0.55,
-          message: '추천 코스를 불러오지 못했습니다. 화면에서 다시 시도해주세요.',
+          value: 0.72,
+          message: '추천 정보를 불러오지 못했습니다. 화면에서 다시 시도해주세요.',
           failed: true,
         );
-        await Future<void>.delayed(const Duration(milliseconds: 1100));
-        return;
+        await Future<void>.delayed(const Duration(milliseconds: 900));
+        return false;
       }
 
       progress.value = const _InitialLoadProgress(
-        value: 0.9,
-        message: '추천 코스를 정리하고 있습니다.',
+        value: 0.88,
+        message: '취향에 맞는 최적 여행 코스를 선택하는 중입니다.',
       );
-      await Future<void>.delayed(const Duration(milliseconds: 180));
+      await Future<void>.delayed(const Duration(milliseconds: 260));
       progress.value = const _InitialLoadProgress(
         value: 1,
         message: '여행 준비가 완료되었습니다.',
       );
-      await Future<void>.delayed(const Duration(milliseconds: 450));
+      await Future<void>.delayed(const Duration(milliseconds: 320));
+      return true;
     } finally {
+      stageTimer.cancel();
       if (mounted && dialogOpen) {
         Navigator.of(context, rootNavigator: true).pop();
       }
@@ -232,7 +235,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _editableSpots = [];
       _previewMetrics = null;
     });
-    await _loadRegion();
+    await _loadRegionWithDelayedDialog();
   }
 
   void _persistSession() {
@@ -277,7 +280,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _previewMetrics = null;
     });
     _persistSession();
-    _loadRegion();
+    _loadRegionWithDelayedDialog();
   }
 
   void _applyVariant(int index, List<Course> courses) {
@@ -462,6 +465,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     region: _combo.name,
                     course: liveCourse,
                     loading: loading,
+                    onRetry: () =>
+                        _loadRegionWithDelayedDialog(forceRefresh: true),
                   ),
                   const SizedBox(height: 26),
                   _RegionSelector(
@@ -487,7 +492,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   if (curationState.errorMessage != null) ...[
                     _ApiErrorBanner(
                       message: curationState.errorMessage!,
-                      onRetry: () => _loadRegion(forceRefresh: true),
+                      onRetry: () =>
+                          _loadRegionWithDelayedDialog(forceRefresh: true),
                     ),
                     const SizedBox(height: 16),
                   ],
@@ -678,7 +684,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                           ),
                                         );
                                       }
-                                    : _loadRegion,
+                                    : _loadRegionWithDelayedDialog,
                                 icon: Icon(
                                   isSaved
                                       ? Icons.bookmark_rounded
@@ -1074,11 +1080,13 @@ class _HourlyWeatherCard extends StatelessWidget {
     required this.region,
     required this.course,
     required this.loading,
+    required this.onRetry,
   });
 
   final String region;
   final Course? course;
   final bool loading;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -1117,16 +1125,19 @@ class _HourlyWeatherCard extends StatelessWidget {
           if (loading)
             const LinearProgressIndicator(minHeight: 3)
           else if (forecasts.isEmpty)
-            Text(
-              course == null
-                  ? '서버에서 예보를 불러오고 있어요.'
-                  : rainy
-                  ? '강수 예보가 있어 실내 코스를 우선 추천해요.'
-                  : '현재 강수 예정은 없어요.',
-              style: const TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 12,
-              ),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '시간대별 예보를 불러오지 못했어요. 다시 확인해주세요.',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                TextButton(onPressed: onRetry, child: const Text('재시도')),
+              ],
             )
           else
             SizedBox(
@@ -1207,10 +1218,37 @@ class _SpotDetailSheet extends StatelessWidget {
       .replaceAll('&#39;', "'")
       .trim();
 
+  Uri? _homepageUri(String value) {
+    final decoded = value.replaceAll('&amp;', '&');
+    final href = RegExp(
+      r'''href\s*=\s*["']([^"']+)["']''',
+      caseSensitive: false,
+    ).firstMatch(decoded)?.group(1);
+    final rawUrl = RegExp(
+      r'''https?://[^\s<>"']+''',
+      caseSensitive: false,
+    ).firstMatch(decoded)?.group(0);
+    final candidate = href ?? rawUrl;
+    if (candidate == null) return null;
+    final uri = Uri.tryParse(candidate);
+    return uri != null && (uri.scheme == 'http' || uri.scheme == 'https')
+        ? uri
+        : null;
+  }
+
+  Future<void> _openUri(BuildContext context, Uri uri) async {
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('연결된 페이지를 열 수 없어요.')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Container(
     constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * 0.86,
+      maxHeight: MediaQuery.sizeOf(context).height * 0.94,
     ),
     padding: EdgeInsets.fromLTRB(
       22,
@@ -1271,9 +1309,8 @@ class _SpotDetailSheet extends StatelessWidget {
             future: details,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: LinearProgressIndicator(minHeight: 3),
+                return _DelayedDetailLoading(
+                  address: spot?.address,
                 );
               }
               if (snapshot.hasError) {
@@ -1285,7 +1322,9 @@ class _SpotDetailSheet extends StatelessWidget {
               final telephone = _plainText(
                 detail?['telephone'] as String? ?? '',
               );
-              final homepage = _plainText(detail?['homepage'] as String? ?? '');
+              final homepageRaw = detail?['homepage'] as String? ?? '';
+              final homepage = _plainText(homepageRaw);
+              final homepageUri = _homepageUri(homepageRaw);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1332,6 +1371,17 @@ class _SpotDetailSheet extends StatelessWidget {
                       text: homepage,
                     ),
                   ],
+                  if (homepageUri != null) ...[
+                    const SizedBox(height: 16),
+                    FilledButton.tonalIcon(
+                      onPressed: () => _openUri(context, homepageUri),
+                      icon: const Icon(Icons.open_in_new_rounded),
+                      label: const Text('공식 홈페이지 열기'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                    ),
+                  ],
                 ],
               );
             },
@@ -1360,6 +1410,60 @@ class _SpotDetailSheet extends StatelessWidget {
         ],
       ),
     ),
+  );
+}
+
+class _DelayedDetailLoading extends StatefulWidget {
+  const _DelayedDetailLoading({this.address});
+
+  final String? address;
+
+  @override
+  State<_DelayedDetailLoading> createState() => _DelayedDetailLoadingState();
+}
+
+class _DelayedDetailLoadingState extends State<_DelayedDetailLoading> {
+  Timer? _timer;
+  bool _showProgress = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer(const Duration(seconds: 1), () {
+      if (mounted) setState(() => _showProgress = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (widget.address?.isNotEmpty == true)
+        _DetailInfoRow(
+          icon: Icons.place_outlined,
+          text: widget.address!,
+        ),
+      const SizedBox(height: 14),
+      Text(
+        _showProgress
+            ? 'TourAPI에서 상세 소개와 홈페이지를 확인하고 있어요.'
+            : '장소 기본 정보를 먼저 보여드리고 있어요.',
+        style: const TextStyle(
+          color: AppTheme.textSecondary,
+          fontSize: 12,
+        ),
+      ),
+      if (_showProgress) ...[
+        const SizedBox(height: 10),
+        const LinearProgressIndicator(minHeight: 3),
+      ],
+    ],
   );
 }
 

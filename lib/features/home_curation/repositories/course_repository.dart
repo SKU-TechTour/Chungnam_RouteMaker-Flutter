@@ -56,36 +56,40 @@ class CourseRepository {
       'variant': variant,
     };
     try {
-      late final Response<Map<String, dynamic>> response;
-      try {
-        response = await retryTransientDio(
-          () => _dio.post<Map<String, dynamic>>(
-            '/api/courses/recommendations',
-            data: requestData,
-            options: Options(extra: {'skipFirebaseAuth': true}),
-          ),
-        );
-      } on DioException catch (error) {
-        // 이전 서버 버전은 목록 경로만 인증 대상으로 설정되어 있었습니다.
-        // 인증 갱신 후에도 401/403이면 공개된 단일 실시간 추천 경로로 내려가
-        // 빈 홈 대신 최소 한 개의 실제 TourAPI 코스를 제공합니다.
-        if (error.response?.statusCode != 401 &&
-            error.response?.statusCode != 403) {
-          rethrow;
+      var courses = await _fetchCoursesOnce(requestData);
+      // 간헐적으로 코스 응답은 성공하지만 기상청 배열만 비어 오는 경우가 있다.
+      // 빈 예보를 '비가 오지 않음'으로 오인하지 않고 한 번만 다시 요청한다.
+      if (courses.isNotEmpty &&
+          courses.every((course) => course.hourlyWeather.isEmpty)) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        try {
+          final retried = await _fetchCoursesOnce(requestData);
+          if (retried.any((course) => course.hourlyWeather.isNotEmpty)) {
+            courses = retried;
+          }
+        } catch (_) {
+          // 관광 코스 자체는 유효하므로 날씨 재시도 실패가 전체 화면을 막지 않는다.
         }
-        final fallback = await retryTransientDio(
-          () => _dio.post<Map<String, dynamic>>(
-            '/api/courses/recommend',
-            data: requestData,
-            options: Options(extra: {'skipFirebaseAuth': true}),
-          ),
-        );
-        final fallbackData = fallback.data?['data'];
-        if (fallbackData is! Map<String, dynamic>) {
-          throw const ApiException(message: 'Invalid course response');
-        }
-        return [Course.fromJson(fallbackData)];
       }
+      return courses;
+    } on DioException catch (e) {
+      final error = e.error;
+      if (error is ApiException) throw error;
+      throw ApiException(message: e.message ?? 'Failed to fetch courses');
+    }
+  }
+
+  Future<List<Course>> _fetchCoursesOnce(
+    Map<String, dynamic> requestData,
+  ) async {
+    try {
+      final response = await retryTransientDio(
+        () => _dio.post<Map<String, dynamic>>(
+          '/api/courses/recommendations',
+          data: requestData,
+          options: Options(extra: {'skipFirebaseAuth': true}),
+        ),
+      );
       final data = response.data?['data'] as List<dynamic>?;
       if (data == null) {
         throw const ApiException(message: 'Invalid course list response');
@@ -93,10 +97,24 @@ class CourseRepository {
       return data
           .map((item) => Course.fromJson(item as Map<String, dynamic>))
           .toList();
-    } on DioException catch (e) {
-      final error = e.error;
-      if (error is ApiException) throw error;
-      throw ApiException(message: e.message ?? 'Failed to fetch courses');
+    } on DioException catch (error) {
+      // 이전 서버 버전은 목록 경로만 인증 대상으로 설정되어 있었습니다.
+      if (error.response?.statusCode != 401 &&
+          error.response?.statusCode != 403) {
+        rethrow;
+      }
+      final fallback = await retryTransientDio(
+        () => _dio.post<Map<String, dynamic>>(
+          '/api/courses/recommend',
+          data: requestData,
+          options: Options(extra: {'skipFirebaseAuth': true}),
+        ),
+      );
+      final fallbackData = fallback.data?['data'];
+      if (fallbackData is! Map<String, dynamic>) {
+        throw const ApiException(message: 'Invalid course response');
+      }
+      return [Course.fromJson(fallbackData)];
     }
   }
 
