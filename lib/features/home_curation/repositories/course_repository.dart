@@ -15,6 +15,21 @@ class CourseRepository {
 
   final Dio _dio;
 
+  Future<bool> isServerHealthy() async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/actuator/health',
+        options: Options(
+          extra: {'skipFirebaseAuth': true},
+          receiveTimeout: const Duration(seconds: 7),
+        ),
+      );
+      return response.statusCode == 200 && response.data?['status'] == 'UP';
+    } on DioException {
+      return false;
+    }
+  }
+
   Future<List<Course>> loadMockCourses({required String region}) async {
     final raw = await rootBundle.loadString('assets/mock/courses.json');
     final list = jsonDecode(raw) as List<dynamic>;

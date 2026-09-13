@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -157,47 +155,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: _InitialLoadDialog(progress: progress),
       ),
     ).whenComplete(() => dialogOpen = false);
-    final timer = Timer.periodic(const Duration(milliseconds: 280), (_) {
-      final current = progress.value.value;
-      if (current >= 0.9) return;
-      final next = (current + 0.035).clamp(0.0, 0.9);
-      progress.value = _InitialLoadProgress(
-        value: next,
-        message: next < 0.38
-            ? '사용자에게 알맞은 정보를 불러오는 중입니다.'
-            : next < 0.72
-            ? '지역별 날씨를 불러오는 중입니다.'
-            : '추천 코스를 정리하고 있습니다.',
-      );
-    });
     await Future<void>.delayed(Duration.zero);
     try {
-      await _loadRegion();
-      final state = ref.read(homeCurationViewModelProvider);
-      if (state.errorMessage == null && state.courses.isNotEmpty) {
-        final allRegionsLoaded = await _prefetchOtherRegionsSequentially();
-        if (allRegionsLoaded) {
-          progress.value = const _InitialLoadProgress(
-            value: 1,
-            message: '여행 준비가 완료되었습니다.',
-          );
-          await Future<void>.delayed(const Duration(milliseconds: 450));
-        } else {
-          progress.value = _InitialLoadProgress(
-            value: progress.value.value,
-            message: '일부 지역 연결이 지연되고 있어요. 화면에서 다시 시도해주세요.',
-          );
-          await Future<void>.delayed(const Duration(milliseconds: 700));
-        }
-      } else {
-        progress.value = _InitialLoadProgress(
-          value: progress.value.value,
-          message: '연결이 지연되고 있어요. 화면에서 다시 시도해주세요.',
+      progress.value = const _InitialLoadProgress(
+        value: 0.15,
+        message: '여행 서버 연결을 확인하고 있습니다.',
+      );
+      final serverHealthy = await ref
+          .read(courseRepositoryProvider)
+          .isServerHealthy();
+      if (!serverHealthy) {
+        progress.value = const _InitialLoadProgress(
+          value: 0.15,
+          message: '여행 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.',
+          failed: true,
         );
-        await Future<void>.delayed(const Duration(milliseconds: 700));
+        await Future<void>.delayed(const Duration(milliseconds: 1100));
+        return;
       }
+
+      progress.value = const _InitialLoadProgress(
+        value: 0.35,
+        message: '사용자에게 알맞은 관광정보를 불러오는 중입니다.',
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      progress.value = const _InitialLoadProgress(
+        value: 0.55,
+        message: '지역별 날씨와 이동 정보를 불러오는 중입니다.',
+      );
+      final loaded = await _loadRegion();
+      if (!loaded) {
+        progress.value = const _InitialLoadProgress(
+          value: 0.55,
+          message: '추천 코스를 불러오지 못했습니다. 화면에서 다시 시도해주세요.',
+          failed: true,
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 1100));
+        return;
+      }
+
+      progress.value = const _InitialLoadProgress(
+        value: 0.9,
+        message: '추천 코스를 정리하고 있습니다.',
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+      progress.value = const _InitialLoadProgress(
+        value: 1,
+        message: '여행 준비가 완료되었습니다.',
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 450));
     } finally {
-      timer.cancel();
       if (mounted && dialogOpen) {
         Navigator.of(context, rootNavigator: true).pop();
       }
@@ -226,7 +233,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _previewMetrics = null;
     });
     await _loadRegion();
-    _prefetchOtherRegions();
   }
 
   void _persistSession() {
@@ -241,7 +247,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Future<void> _loadRegion({bool forceRefresh = false}) async {
+  Future<bool> _loadRegion({bool forceRefresh = false}) async {
     final generation = ++_loadGeneration;
     final nonsanTemplate = _combo.code == 'NONSAN'
         ? _routeTemplate
@@ -256,33 +262,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           concepts: _concepts.map((concept) => concept.name).toSet(),
           forceRefresh: forceRefresh,
         );
-    if (!mounted || generation != _loadGeneration) return;
-    final courses = ref.read(homeCurationViewModelProvider).courses;
-    if (courses.isNotEmpty) _applyVariant(0, courses);
-  }
-
-  void _prefetchOtherRegions() {
-    unawaited(_prefetchOtherRegionsSequentially());
-  }
-
-  Future<bool> _prefetchOtherRegionsSequentially() async {
-    final concepts = _concepts.map((concept) => concept.name).toSet();
-    var allLoaded = true;
-    for (final combo in _combos.where((item) => item.code != _combo.code)) {
-      final loaded = await ref
-          .read(homeCurationViewModelProvider.notifier)
-          .prefetchCourses(
-            region: combo.code,
-            military: combo.code == 'NONSAN' && _party != TravelParty.traveler,
-            journeyType: _party.name,
-            routeTemplate: combo.code == 'NONSAN'
-                ? _routeTemplate.apiCode
-                : RouteTemplate.travelerFlexible.apiCode,
-            concepts: concepts,
-          );
-      allLoaded = allLoaded && loaded;
-    }
-    return allLoaded;
+    if (!mounted || generation != _loadGeneration) return false;
+    final state = ref.read(homeCurationViewModelProvider);
+    final loaded = state.errorMessage == null && state.courses.isNotEmpty;
+    if (loaded) _applyVariant(0, state.courses);
+    return loaded;
   }
 
   void _selectRegion(int index) {
@@ -1737,10 +1721,15 @@ class _ConceptCatalog extends StatelessWidget {
 }
 
 class _InitialLoadProgress {
-  const _InitialLoadProgress({required this.value, required this.message});
+  const _InitialLoadProgress({
+    required this.value,
+    required this.message,
+    this.failed = false,
+  });
 
   final double value;
   final String message;
+  final bool failed;
 }
 
 class _InitialLoadDialog extends StatelessWidget {
@@ -1765,13 +1754,19 @@ class _InitialLoadDialog extends StatelessWidget {
                 Container(
                   width: 42,
                   height: 42,
-                  decoration: const BoxDecoration(
-                    color: AppTheme.softMint,
+                  decoration: BoxDecoration(
+                    color: state.failed
+                        ? const Color(0xFFFFEBEE)
+                        : AppTheme.softMint,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.route_rounded,
-                    color: AppTheme.primary,
+                  child: Icon(
+                    state.failed
+                        ? Icons.cloud_off_rounded
+                        : Icons.route_rounded,
+                    color: state.failed
+                        ? const Color(0xFFC94545)
+                        : AppTheme.primary,
                   ),
                 ),
                 const SizedBox(width: 13),
@@ -1803,7 +1798,11 @@ class _InitialLoadDialog extends StatelessWidget {
                 minHeight: 9,
                 borderRadius: BorderRadius.circular(99),
                 backgroundColor: AppTheme.divider,
-                color: state.value >= 1 ? AppTheme.accent : AppTheme.primary,
+                color: state.failed
+                    ? const Color(0xFFC94545)
+                    : state.value >= 1
+                    ? AppTheme.accent
+                    : AppTheme.primary,
               ),
             ),
             const SizedBox(height: 9),
@@ -1812,7 +1811,11 @@ class _InitialLoadDialog extends StatelessWidget {
               child: Text(
                 '$percent%',
                 style: TextStyle(
-                  color: state.value >= 1 ? AppTheme.accent : AppTheme.primary,
+                  color: state.failed
+                      ? const Color(0xFFC94545)
+                      : state.value >= 1
+                      ? AppTheme.accent
+                      : AppTheme.primary,
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                 ),

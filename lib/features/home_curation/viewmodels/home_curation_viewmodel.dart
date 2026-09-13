@@ -33,7 +33,11 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
       concepts: concepts,
     );
     _latestRequestKey = cacheKey;
-    state = state.copyWith(isLoading: true, clearError: true);
+    state = state.copyWith(
+      isLoading: true,
+      clearError: true,
+      clearCourses: true,
+    );
     final repository = ref.read(courseRepositoryProvider);
     if (ApiConstants.useMockData) {
       final courses = await repository.loadMockCourses(region: region);
@@ -60,6 +64,7 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
               concepts: concepts,
             ),
           );
+      _validateCourses(courses);
       if (_latestRequestKey != cacheKey) return;
       state = state.copyWith(
         courses: courses,
@@ -95,7 +100,7 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
     if (_sessionCache.containsKey(cacheKey)) return true;
     final repository = ref.read(courseRepositoryProvider);
     try {
-      await _fetchOnce(
+      final courses = await _fetchOnce(
         cacheKey,
         () => repository.fetchCourses(
           region: region,
@@ -105,11 +110,33 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
           concepts: concepts,
         ),
       );
+      _validateCourses(courses);
       return true;
     } catch (_) {
       // 사전 로딩 실패는 현재 화면을 깨뜨리지 않습니다. 해당 지역 진입 시
       // 사용자가 재시도할 수 있도록 정상 로딩 흐름에 맡깁니다.
       return false;
+    }
+  }
+
+  void _validateCourses(List<Course> courses) {
+    final valid = courses.isNotEmpty &&
+        courses.every(
+          (course) =>
+              course.spots.length >= 2 &&
+              course.spots.every(
+                (spot) =>
+                    spot.latitude.isFinite &&
+                    spot.longitude.isFinite &&
+                    spot.latitude >= -90 &&
+                    spot.latitude <= 90 &&
+                    spot.longitude >= -180 &&
+                    spot.longitude <= 180 &&
+                    !(spot.latitude == 0 && spot.longitude == 0),
+              ),
+        );
+    if (!valid) {
+      throw const ApiException(message: 'Empty or invalid course response');
     }
   }
 
@@ -120,6 +147,7 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
     final running = _inFlight[cacheKey];
     if (running != null) return running;
     final future = request().then((courses) {
+      _validateCourses(courses);
       _sessionCache[cacheKey] = List.unmodifiable(courses);
       return courses;
     });
@@ -146,6 +174,9 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
       }
       if (error.statusCode == 401 || error.statusCode == 403) {
         return '로그인 인증이 만료되었습니다. 앱을 다시 실행해주세요. (${error.statusCode})';
+      }
+      if (error.statusCode == 503) {
+        return '여행 서버가 현재 중지되어 있습니다. 서버 재시작 후 다시 시도해주세요. (503)';
       }
       if (error.message.contains('환경변수')) {
         return '서버의 공공 API 환경변수가 등록되지 않았습니다.';

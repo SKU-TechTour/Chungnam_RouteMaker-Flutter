@@ -31,6 +31,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool _locating = false;
   bool _loadingRoadRoute = false;
   bool _usingFallbackTiles = false;
+  bool _tileUnavailable = false;
+  int _fallbackTileErrors = 0;
   bool _mapInitialized = false;
   bool _mapReady = false;
   Timer? _mapReadyTimer;
@@ -177,10 +179,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ref.read(mapSearchViewModelProvider.notifier).searchNearby();
 
   void _onTileError() {
-    if (_usingFallbackTiles || !mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_usingFallbackTiles) {
+      if (!mounted) return;
+      if (!_usingFallbackTiles) {
         setState(() => _usingFallbackTiles = true);
+        return;
+      }
+      _fallbackTileErrors++;
+      if (_fallbackTileErrors >= 3 && !_tileUnavailable) {
+        setState(() => _tileUnavailable = true);
       }
     });
   }
@@ -393,7 +400,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final places = selectedRoute == null
         ? state.places
         : selectedRoute.spots.map(Place.fromCourseSpot).toList();
-    final points = places
+    final mappablePlaces = places.where(_hasValidCoordinates).toList();
+    final points = mappablePlaces
         .map((place) => ll.LatLng(place.lat, place.lng))
         .toList();
     final routePoints = _roadPoints.length > 1 ? _roadPoints : points;
@@ -438,7 +446,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   ),
                 fm.MarkerLayer(
                   markers: [
-                    ...places.asMap().entries.map((entry) {
+                    ...mappablePlaces.asMap().entries.map((entry) {
                       final place = entry.value;
                       return fm.Marker(
                         point: ll.LatLng(place.lat, place.lng),
@@ -468,6 +476,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ],
             ),
           ),
+          if (_tileUnavailable)
+            Positioned.fill(child: _RouteFallbackMap(places: mappablePlaces)),
           if (!_mapReady)
             const Positioned.fill(
               child: ColoredBox(
@@ -653,6 +663,131 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ),
     );
   }
+
+  bool _hasValidCoordinates(Place place) =>
+      place.lat.isFinite &&
+      place.lng.isFinite &&
+      place.lat >= -90 &&
+      place.lat <= 90 &&
+      place.lng >= -180 &&
+      place.lng <= 180 &&
+      !(place.lat == 0 && place.lng == 0);
+}
+
+class _RouteFallbackMap extends StatelessWidget {
+  const _RouteFallbackMap({required this.places});
+
+  final List<Place> places;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    color: const Color(0xFFF0F4F0),
+    child: Stack(
+      children: [
+        Positioned.fill(
+          child: CustomPaint(painter: _RouteSketchPainter(places)),
+        ),
+        Positioned(
+          top: MediaQuery.paddingOf(context).top + 102,
+          left: 24,
+          right: 24,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.94),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.divider),
+            ),
+            child: const Row(
+              children: [
+                Icon(
+                  Icons.map_outlined,
+                  size: 18,
+                  color: AppTheme.primary,
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '지도 연결이 지연되어 코스 위치를 간이 지도로 표시합니다.',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _RouteSketchPainter extends CustomPainter {
+  const _RouteSketchPainter(this.places);
+
+  final List<Place> places;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = const Color(0xFFDCE5DE)
+      ..strokeWidth = 1;
+    for (double x = 0; x < size.width; x += 42) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+    }
+    for (double y = 0; y < size.height; y += 42) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+    if (places.isEmpty) return;
+
+    final minLat = places.map((place) => place.lat).reduce((a, b) => a < b ? a : b);
+    final maxLat = places.map((place) => place.lat).reduce((a, b) => a > b ? a : b);
+    final minLng = places.map((place) => place.lng).reduce((a, b) => a < b ? a : b);
+    final maxLng = places.map((place) => place.lng).reduce((a, b) => a > b ? a : b);
+    final latSpan = (maxLat - minLat).abs();
+    final lngSpan = (maxLng - minLng).abs();
+    final usableWidth = (size.width - 96).clamp(1.0, double.infinity);
+    final usableHeight = (size.height - 300).clamp(1.0, double.infinity);
+    final offsets = places.map((place) {
+      final xRatio = lngSpan < 0.000001 ? 0.5 : (place.lng - minLng) / lngSpan;
+      final yRatio = latSpan < 0.000001 ? 0.5 : (maxLat - place.lat) / latSpan;
+      return Offset(48 + usableWidth * xRatio, 175 + usableHeight * yRatio);
+    }).toList();
+
+    final routePaint = Paint()
+      ..color = AppTheme.primary.withValues(alpha: 0.72)
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    if (offsets.length > 1) {
+      final path = Path()..moveTo(offsets.first.dx, offsets.first.dy);
+      for (final point in offsets.skip(1)) {
+        path.lineTo(point.dx, point.dy);
+      }
+      canvas.drawPath(path, routePaint);
+    }
+
+    for (var index = 0; index < offsets.length; index++) {
+      final point = offsets[index];
+      canvas.drawCircle(point, 18, Paint()..color = Colors.white);
+      canvas.drawCircle(point, 15, Paint()..color = AppTheme.primary);
+      final label = TextPainter(
+        text: TextSpan(
+          text: '${index + 1}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      label.paint(canvas, point - Offset(label.width / 2, label.height / 2));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RouteSketchPainter oldDelegate) =>
+      oldDelegate.places != places;
 }
 
 class _JourneyControlCard extends StatelessWidget {

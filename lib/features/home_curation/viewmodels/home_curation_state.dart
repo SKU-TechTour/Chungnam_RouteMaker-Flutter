@@ -23,9 +23,10 @@ class HomeCurationState {
     bool? isLoading,
     String? errorMessage,
     bool clearError = false,
+    bool clearCourses = false,
   }) {
     return HomeCurationState(
-      courses: courses ?? this.courses,
+      courses: clearCourses ? const [] : (courses ?? this.courses),
       currentIndex: currentIndex ?? this.currentIndex,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
