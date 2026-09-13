@@ -59,10 +59,9 @@ class SavedScreen extends ConsumerWidget {
                         .read(savedCoursesProvider.notifier)
                         .remove(entry.value.id),
                     onStart: () {
-                      ref.read(selectedRouteProvider.notifier).state = entry
-                          .value
-                          .toSelectedRoute();
-                      context.go('/map');
+                      final route = entry.value.toSelectedRoute();
+                      ref.read(selectedRouteProvider.notifier).state = route;
+                      context.go('/map', extra: route);
                     },
                   ),
                 ),

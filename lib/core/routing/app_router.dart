@@ -4,6 +4,7 @@ import 'package:flutterprojects/features/onboarding/views/onboarding_screen.dart
 import 'package:flutterprojects/features/auth/views/login_screen.dart';
 import 'package:flutterprojects/features/home_curation/views/home_screen.dart';
 import 'package:flutterprojects/features/home_curation/views/main_shell.dart';
+import 'package:flutterprojects/features/home_curation/models/selected_route.dart';
 import 'package:flutterprojects/features/map_search/views/map_screen.dart';
 import 'package:flutterprojects/features/saved/views/saved_screen.dart';
 import 'package:flutterprojects/features/my_history/views/my_history_screen.dart';
@@ -29,7 +30,14 @@ final appRouter = GoRouter(
       builder: (context, state, child) => MainShell(child: child),
       routes: [
         GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
-        GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
+        GoRoute(
+          path: '/map',
+          builder: (context, state) => MapScreen(
+            initialRoute: state.extra is SelectedRoute
+                ? state.extra! as SelectedRoute
+                : null,
+          ),
+        ),
         GoRoute(
           path: '/saved',
           builder: (context, state) => const SavedScreen(),

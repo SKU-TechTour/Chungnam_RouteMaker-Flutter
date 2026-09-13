@@ -712,11 +712,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     liveCourse != null ||
                                         ApiConstants.useMockData
                                     ? () {
-                                        ref
-                                            .read(
-                                              selectedRouteProvider.notifier,
-                                            )
-                                            .state = SelectedRoute(
+                                        final route = SelectedRoute(
                                           title:
                                               liveCourse?.title ??
                                               '${_combo.name} 취향 맞춤 코스',
@@ -733,7 +729,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                   ?.totalDurationSeconds ??
                                               0,
                                         );
-                                        context.go('/map');
+                                        ref
+                                                .read(
+                                                  selectedRouteProvider
+                                                      .notifier,
+                                                )
+                                                .state =
+                                            route;
+                                        context.go('/map', extra: route);
                                       }
                                     : _loadRegion,
                                 icon: const Icon(Icons.navigation_rounded),

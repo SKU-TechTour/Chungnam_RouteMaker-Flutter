@@ -3,6 +3,7 @@ import '../../features/splash/views/splash_screen.dart';
 import '../../features/onboarding/views/onboarding_screen.dart';
 import '../../features/auth/views/login_screen.dart';
 import '../../features/home_curation/views/home_screen.dart';
+import '../../features/home_curation/models/selected_route.dart';
 import '../../features/map_search/views/map_screen.dart';
 import '../../features/my_history/views/my_history_screen.dart';
 import '../../features/saved/views/saved_screen.dart';
@@ -24,7 +25,14 @@ final appRouter = GoRouter(
       builder: (context, state, child) => MainShell(child: child),
       routes: [
         GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
-        GoRoute(path: '/map', builder: (_, _) => const MapScreen()),
+        GoRoute(
+          path: '/map',
+          builder: (_, state) => MapScreen(
+            initialRoute: state.extra is SelectedRoute
+                ? state.extra! as SelectedRoute
+                : null,
+          ),
+        ),
         GoRoute(path: '/saved', builder: (_, _) => const SavedScreen()),
         GoRoute(path: '/history', builder: (_, _) => const MyHistoryScreen()),
       ],

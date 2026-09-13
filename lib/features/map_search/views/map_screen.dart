@@ -20,7 +20,9 @@ const _regionCenters = {
 };
 
 class MapScreen extends ConsumerStatefulWidget {
-  const MapScreen({super.key});
+  const MapScreen({super.key, this.initialRoute});
+
+  final SelectedRoute? initialRoute;
 
   @override
   ConsumerState<MapScreen> createState() => _MapScreenState();
@@ -55,7 +57,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _mapReadyTimer?.cancel();
     setState(() => _mapReady = true);
 
-    final selected = ref.read(selectedRouteProvider);
+    final selected = ref.read(selectedRouteProvider) ?? widget.initialRoute;
     if (selected != null && selected.spots.length > 1) {
       _mapController.fitCamera(
         fm.CameraFit.bounds(
@@ -389,7 +391,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(mapSearchViewModelProvider);
-    final selectedRoute = ref.watch(selectedRouteProvider);
+    final selectedRoute =
+        ref.watch(selectedRouteProvider) ?? widget.initialRoute;
     final journey = ref.watch(journeyProgressProvider);
     final activeJourney =
         selectedRoute != null &&
@@ -409,7 +412,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          const Positioned.fill(child: ColoredBox(color: Color(0xFFE5ECE7))),
+          Positioned.fill(child: _RouteFallbackMap(places: mappablePlaces)),
           Positioned.fill(
             child: fm.FlutterMap(
               mapController: _mapController,
@@ -418,6 +421,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ? points.first
                     : const ll.LatLng(36.4465, 127.1191),
                 initialZoom: 12,
+                backgroundColor: Colors.transparent,
                 onMapReady: _initializeMap,
               ),
               children: [
