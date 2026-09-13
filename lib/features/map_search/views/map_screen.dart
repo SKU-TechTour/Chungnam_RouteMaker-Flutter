@@ -424,11 +424,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 fm.TileLayer(
                   key: ValueKey(_usingFallbackTiles),
                   urlTemplate: _usingFallbackTiles
-                      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
-                      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  fallbackUrl: _usingFallbackTiles
                       ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
                       : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+                  fallbackUrl: _usingFallbackTiles
+                      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
+                      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.techtour.flutterprojects',
                   errorTileCallback: (_, _, _) => _onTileError(),
                   evictErrorTileStrategy:
@@ -700,11 +700,7 @@ class _RouteFallbackMap extends StatelessWidget {
             ),
             child: const Row(
               children: [
-                Icon(
-                  Icons.map_outlined,
-                  size: 18,
-                  color: AppTheme.primary,
-                ),
+                Icon(Icons.map_outlined, size: 18, color: AppTheme.primary),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -739,10 +735,18 @@ class _RouteSketchPainter extends CustomPainter {
     }
     if (places.isEmpty) return;
 
-    final minLat = places.map((place) => place.lat).reduce((a, b) => a < b ? a : b);
-    final maxLat = places.map((place) => place.lat).reduce((a, b) => a > b ? a : b);
-    final minLng = places.map((place) => place.lng).reduce((a, b) => a < b ? a : b);
-    final maxLng = places.map((place) => place.lng).reduce((a, b) => a > b ? a : b);
+    final minLat = places
+        .map((place) => place.lat)
+        .reduce((a, b) => a < b ? a : b);
+    final maxLat = places
+        .map((place) => place.lat)
+        .reduce((a, b) => a > b ? a : b);
+    final minLng = places
+        .map((place) => place.lng)
+        .reduce((a, b) => a < b ? a : b);
+    final maxLng = places
+        .map((place) => place.lng)
+        .reduce((a, b) => a > b ? a : b);
     final latSpan = (maxLat - minLat).abs();
     final lngSpan = (maxLng - minLng).abs();
     final usableWidth = (size.width - 96).clamp(1.0, double.infinity);
