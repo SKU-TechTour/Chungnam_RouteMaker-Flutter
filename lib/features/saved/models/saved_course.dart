@@ -10,6 +10,7 @@ class SavedCourse {
     required this.spots,
     required this.totalDistanceMeters,
     required this.totalDurationSeconds,
+    this.bookmarkCount = 0,
   });
 
   final String id;
@@ -19,6 +20,10 @@ class SavedCourse {
   final List<CourseSpot> spots;
   final int totalDistanceMeters;
   final int totalDurationSeconds;
+  final int bookmarkCount;
+
+  String get routeKey =>
+      '$regionCode:${spots.map((spot) => spot.id).join('-')}';
 
   factory SavedCourse.fromJson(Map<String, dynamic> json) => SavedCourse(
     id: json['id'] as String,
@@ -30,6 +35,21 @@ class SavedCourse {
         .toList(),
     totalDistanceMeters: json['totalDistanceMeters'] as int? ?? 0,
     totalDurationSeconds: json['totalDurationSeconds'] as int? ?? 0,
+    bookmarkCount: json['bookmarkCount'] as int? ?? 0,
+  );
+
+  factory SavedCourse.fromPopularApi(Map<String, dynamic> json) => SavedCourse(
+    id: json['routeKey'] as String,
+    region: _regionLabel(json['region'] as String? ?? ''),
+    regionCode: json['region'] as String? ?? '',
+    title: json['title'] as String? ?? '인기 코스',
+    spots: (json['spots'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(CourseSpot.fromJson)
+        .toList(growable: false),
+    totalDistanceMeters: (json['totalDistanceMeters'] as num?)?.round() ?? 0,
+    totalDurationSeconds: (json['totalDurationSeconds'] as num?)?.round() ?? 0,
+    bookmarkCount: (json['bookmarkCount'] as num?)?.round() ?? 0,
   );
 
   Map<String, dynamic> toJson() => {
@@ -52,6 +72,30 @@ class SavedCourse {
           },
         )
         .toList(),
+    'totalDistanceMeters': totalDistanceMeters,
+    'totalDurationSeconds': totalDurationSeconds,
+    'bookmarkCount': bookmarkCount,
+  };
+
+  Map<String, dynamic> toBookmarkRequest() => {
+    'routeKey': routeKey,
+    'region': regionCode,
+    'title': title,
+    'spots': spots
+        .map(
+          (spot) => {
+            'id': spot.id,
+            'name': spot.name,
+            'category': spot.category,
+            'latitude': spot.latitude,
+            'longitude': spot.longitude,
+            'imageUrl': spot.imageUrl,
+            'source': spot.source,
+            'address': spot.address,
+            'scheduledTime': spot.scheduledTime,
+          },
+        )
+        .toList(growable: false),
     'totalDistanceMeters': totalDistanceMeters,
     'totalDurationSeconds': totalDurationSeconds,
   };
@@ -80,3 +124,10 @@ class SavedCourse {
   @override
   int get hashCode => id.hashCode;
 }
+
+String _regionLabel(String code) => switch (code) {
+  'NONSAN' => '논산',
+  'GONGJU' => '공주',
+  'BUYEO' => '부여',
+  _ => code,
+};

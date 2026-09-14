@@ -426,6 +426,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       curationState.courses.expand((course) => course.spots),
     );
     final saved = ref.watch(savedCoursesProvider);
+    final popularCourses = ref.watch(popularCoursesProvider);
     final selectedSpots = _editableSpots;
     final selectedCourse = _selectedCourse(liveCourse, selectedSpots);
     final isSaved = saved.any((course) => course.hasSameRoute(selectedCourse));
@@ -496,6 +497,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _PreferenceSummary(
                     concepts: _concepts,
                     onEdit: _editPreferences,
+                  ),
+                  const SizedBox(height: 24),
+                  _PopularCoursesSection(
+                    courses: popularCourses,
+                    onStart: (course) {
+                      final route = course.toSelectedRoute();
+                      ref.read(selectedRouteProvider.notifier).state = route;
+                      context.go('/map', extra: route);
+                    },
                   ),
                   const SizedBox(height: 26),
                   if (curationState.errorMessage != null) ...[
@@ -777,6 +787,152 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
   }
+}
+
+class _PopularCoursesSection extends StatelessWidget {
+  const _PopularCoursesSection({required this.courses, required this.onStart});
+
+  final AsyncValue<List<SavedCourse>> courses;
+  final ValueChanged<SavedCourse> onStart;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Row(
+        children: [
+          Icon(Icons.local_fire_department_rounded, color: AppTheme.coral),
+          SizedBox(width: 8),
+          Text(
+            '가장 인기 있는 코스 TOP 3',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+      const SizedBox(height: 5),
+      const Text(
+        '여행자들이 실제로 찜한 횟수를 기준으로 보여드려요.',
+        style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+      ),
+      const SizedBox(height: 12),
+      courses.when(
+        loading: () => const SizedBox(
+          height: 76,
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+        error: (_, _) => const _PopularCourseEmpty(
+          message: '인기 코스를 불러오지 못했어요. 잠시 후 다시 확인해주세요.',
+        ),
+        data: (items) => items.isEmpty
+            ? const _PopularCourseEmpty(message: '첫 번째 인기 코스를 기다리고 있어요.')
+            : Column(
+                children: items
+                    .take(3)
+                    .toList(growable: false)
+                    .asMap()
+                    .entries
+                    .map(
+                      (entry) => Padding(
+                        padding: const EdgeInsets.only(bottom: 9),
+                        child: Material(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(18),
+                            onTap: entry.value.spots.length >= 2
+                                ? () => onStart(entry.value)
+                                : null,
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    alignment: Alignment.center,
+                                    decoration: const BoxDecoration(
+                                      color: AppTheme.softCoral,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      '${entry.key + 1}',
+                                      style: const TextStyle(
+                                        color: AppTheme.coral,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          entry.value.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${entry.value.region} · ${entry.value.spots.length}개 경유지',
+                                          style: const TextStyle(
+                                            color: AppTheme.textSecondary,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.bookmark_rounded,
+                                    color: AppTheme.primary,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${entry.value.bookmarkCount}',
+                                    style: const TextStyle(
+                                      color: AppTheme.primary,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.chevron_right_rounded),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
+      ),
+    ],
+  );
+}
+
+class _PopularCourseEmpty extends StatelessWidget {
+  const _PopularCourseEmpty({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+    ),
+    child: Text(
+      message,
+      style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+    ),
+  );
 }
 
 List<CourseSpot> _uniqueSpots(Iterable<CourseSpot> spots) {

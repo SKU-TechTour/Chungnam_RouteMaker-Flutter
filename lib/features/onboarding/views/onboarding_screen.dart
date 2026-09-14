@@ -62,9 +62,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       progress: _revealProgress(150),
                       child: const _ImageStorySection(
                         eyebrow: 'WELCOME TO CHUNGNAM',
-                        title: '충남의 반가운 얼굴과\n여행을 시작해요',
+                        title: '충남의 세 도시를 잇는\n여행을 시작해요',
                         description: '공주·부여·논산의 문화와 풍경을\n당신의 취향에 맞게 이어드릴게요.',
-                        asset: 'assets/images/onboarding/chungnam_mascots.png',
+                        asset:
+                            'assets/images/brand/chungnam_route_maker_logo.png',
                         accent: Color(0xFFF28A42),
                       ),
                     ),
@@ -139,30 +140,6 @@ class _OpeningSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      Container(
-        width: 124,
-        height: 124,
-        padding: const EdgeInsets.all(9),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(36),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primary.withValues(alpha: 0.14),
-              blurRadius: 30,
-              offset: const Offset(0, 14),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(29),
-          child: Image.asset(
-            'assets/images/brand/chungnam_route_maker_logo.png',
-            fit: BoxFit.contain,
-          ),
-        ),
-      ),
-      const SizedBox(height: 30),
       const Text(
         '충남 루트메이커',
         style: TextStyle(
@@ -312,56 +289,117 @@ class _AppPreviewSection extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 26),
-      SizedBox(
-        height: 430,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Expanded(
-              child: _PhonePreview(
-                asset: 'assets/images/onboarding/home_preview.jpg',
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: _PhonePreview(
-                asset: 'assets/images/onboarding/saved_preview.jpg',
-              ),
-            ),
-          ],
-        ),
+      const _PreviewStory(
+        step: '01',
+        title: '날씨를 확인하고\n취향에 맞는 코스를 골라요',
+        description: '지역별 시간대 날씨와 선택한 관심사를 반영한\n추천 코스를 한 화면에서 확인할 수 있어요.',
+        asset: 'assets/images/onboarding/home_preview.jpg',
+        accent: AppTheme.primary,
+      ),
+      const SizedBox(height: 48),
+      const _PreviewStory(
+        step: '02',
+        title: '마음에 드는 코스는\n찜해두고 바로 출발해요',
+        description: '저장한 경유지를 그대로 유지해\n원하는 순간 지도에서 코스를 시작할 수 있어요.',
+        asset: 'assets/images/onboarding/saved_preview.jpg',
+        accent: AppTheme.coral,
       ),
     ],
   );
 }
 
-class _PhonePreview extends StatelessWidget {
-  const _PhonePreview({required this.asset});
+class _PreviewStory extends StatelessWidget {
+  const _PreviewStory({
+    required this.step,
+    required this.title,
+    required this.description,
+    required this.asset,
+    required this.accent,
+  });
 
+  final String step;
+  final String title;
+  final String description;
   final String asset;
+  final Color accent;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(7),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(28),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.1),
-          blurRadius: 26,
-          offset: const Offset(0, 12),
-        ),
-      ],
-    ),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: Image.asset(
-        asset,
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              step,
+              style: TextStyle(color: accent, fontWeight: FontWeight.w900),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: AppTheme.gowunDodum,
+                    fontSize: 24,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 13,
+                    height: 1.55,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-    ),
+      const SizedBox(height: 20),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(23),
+          child: AspectRatio(
+            aspectRatio: 1080 / 2340,
+            child: Image.asset(
+              asset,
+              fit: BoxFit.contain,
+              alignment: Alignment.topCenter,
+              color: const Color(0xFFF7F8F4),
+              colorBlendMode: BlendMode.dstOver,
+            ),
+          ),
+        ),
+      ),
+    ],
   );
 }
 

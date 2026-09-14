@@ -5,7 +5,6 @@ import 'package:latlong2/latlong.dart' as ll;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/di/providers.dart';
-import '../widgets/cached_map_tile_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../home_curation/models/course.dart';
 import '../../home_curation/models/selected_route.dart';
@@ -512,7 +511,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 fm.TileLayer(
                   key: ValueKey(_tileRevision),
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  tileProvider: widget.tileProvider ?? CachedMapTileProvider(),
+                  // flutter_map's provider owns cancellation, HTTP status and
+                  // decoding. A CachedNetworkImageProvider here could leave the
+                  // whole native map blank when a tile request was cancelled.
+                  tileProvider: widget.tileProvider ?? fm.NetworkTileProvider(),
                   maxNativeZoom: 19,
                   panBuffer: 0,
                   userAgentPackageName: 'com.techtour.flutterprojects',
