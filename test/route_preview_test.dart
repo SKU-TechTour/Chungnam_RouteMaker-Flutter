@@ -28,6 +28,35 @@ const _spots = [
 ];
 
 void main() {
+  test('장소 상세정보는 같은 세션에서 한 번만 요청한다', () async {
+    var requestCount = 0;
+    final dio = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requestCount++;
+            handler.resolve(
+              Response(
+                requestOptions: options,
+                data: {
+                  'data': {'overview': '상세 소개'},
+                },
+              ),
+            );
+          },
+        ),
+      );
+    final repository = CourseRepository(dio);
+
+    final first = await repository.fetchSpotDetails('123');
+    final second = await repository.fetchSpotDetails('123');
+
+    expect(first?['overview'], '상세 소개');
+    expect(second?['overview'], '상세 소개');
+    expect(requestCount, 1);
+    dio.close();
+  });
+
   test('일부 구간 누락·응답 순서 변경에도 A→B→C를 모두 연결한다', () async {
     final dio = Dio()
       ..interceptors.add(

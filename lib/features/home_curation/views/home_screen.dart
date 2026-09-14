@@ -146,15 +146,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     await _loadRegionWithDelayedDialog();
   }
 
-  Future<bool> _loadRegionWithDelayedDialog({
-    bool forceRefresh = false,
-  }) async {
+  Future<bool> _loadRegionWithDelayedDialog({bool forceRefresh = false}) async {
     final progress = ValueNotifier<_InitialLoadProgress>(
       const _InitialLoadProgress(
-        value: 0.22,
+        value: 0.12,
         message: 'TourAPI로부터 여행 정보를 불러오는 중입니다.',
       ),
     );
+    final progressTimer = Timer.periodic(const Duration(milliseconds: 280), (
+      _,
+    ) {
+      final current = progress.value;
+      if (current.failed || current.value >= 0.94) return;
+      final next = (current.value + 0.018).clamp(0.0, 0.94);
+      progress.value = _InitialLoadProgress(
+        value: next,
+        message: switch (next) {
+          < 0.4 => 'TourAPI로부터 여행 정보를 불러오는 중입니다.',
+          < 0.7 => '날씨와 이동 정보를 함께 확인하는 중입니다.',
+          _ => '취향에 맞는 여행 코스를 정리하는 중입니다.',
+        },
+      );
+    });
     final loadFuture = _loadRegion(forceRefresh: forceRefresh);
     final completedWithinOneSecond = await Future.any<bool>([
       loadFuture.then((_) => true),
@@ -163,6 +176,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     if (completedWithinOneSecond || !mounted) {
       final loaded = await loadFuture;
+      progressTimer.cancel();
       progress.dispose();
       return loaded;
     }
@@ -176,18 +190,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: _InitialLoadDialog(progress: progress),
       ),
     ).whenComplete(() => dialogOpen = false);
-    final stageTimer = Timer(const Duration(milliseconds: 1400), () {
-      progress.value = const _InitialLoadProgress(
-        value: 0.62,
-        message: '날씨와 이동 정보를 함께 확인하는 중입니다.',
-      );
-    });
     try {
       final loaded = await loadFuture;
-      stageTimer.cancel();
+      progressTimer.cancel();
       if (!loaded) {
-        progress.value = const _InitialLoadProgress(
-          value: 0.72,
+        progress.value = _InitialLoadProgress(
+          value: progress.value.value,
           message: '추천 정보를 불러오지 못했습니다. 화면에서 다시 시도해주세요.',
           failed: true,
         );
@@ -196,8 +204,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
 
       progress.value = const _InitialLoadProgress(
-        value: 0.88,
-        message: '취향에 맞는 최적 여행 코스를 선택하는 중입니다.',
+        value: 0.97,
+        message: '마지막으로 화면을 준비하는 중입니다.',
       );
       await Future<void>.delayed(const Duration(milliseconds: 260));
       progress.value = const _InitialLoadProgress(
@@ -207,7 +215,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       await Future<void>.delayed(const Duration(milliseconds: 320));
       return true;
     } finally {
-      stageTimer.cancel();
+      progressTimer.cancel();
       if (mounted && dialogOpen) {
         Navigator.of(context, rootNavigator: true).pop();
       }
@@ -295,6 +303,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     });
     _persistSession();
+    ref.read(courseRepositoryProvider).prefetchSpotDetails(selected.spots);
   }
 
   Future<void> _refreshRoute() async {
@@ -1309,9 +1318,7 @@ class _SpotDetailSheet extends StatelessWidget {
             future: details,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return _DelayedDetailLoading(
-                  address: spot?.address,
-                );
+                return _DelayedDetailLoading(address: spot?.address);
               }
               if (snapshot.hasError) {
                 return const _DetailLoadError();
@@ -1445,19 +1452,13 @@ class _DelayedDetailLoadingState extends State<_DelayedDetailLoading> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       if (widget.address?.isNotEmpty == true)
-        _DetailInfoRow(
-          icon: Icons.place_outlined,
-          text: widget.address!,
-        ),
+        _DetailInfoRow(icon: Icons.place_outlined, text: widget.address!),
       const SizedBox(height: 14),
       Text(
         _showProgress
             ? 'TourAPI에서 상세 소개와 홈페이지를 확인하고 있어요.'
             : '장소 기본 정보를 먼저 보여드리고 있어요.',
-        style: const TextStyle(
-          color: AppTheme.textSecondary,
-          fontSize: 12,
-        ),
+        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
       ),
       if (_showProgress) ...[
         const SizedBox(height: 10),

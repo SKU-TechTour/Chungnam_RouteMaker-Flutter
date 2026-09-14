@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -14,6 +15,7 @@ class CourseRepository {
   CourseRepository(this._dio);
 
   final Dio _dio;
+  final Map<String, Future<Map<String, dynamic>?>> _spotDetailCache = {};
 
   Future<bool> isServerHealthy() async {
     try {
@@ -137,6 +139,24 @@ class CourseRepository {
   }
 
   Future<Map<String, dynamic>?> fetchSpotDetails(String contentId) async {
+    final cached = _spotDetailCache[contentId];
+    if (cached != null) return cached;
+
+    final request = _fetchSpotDetailsFromNetwork(contentId);
+    _spotDetailCache[contentId] = request;
+    try {
+      return await request;
+    } catch (_) {
+      if (identical(_spotDetailCache[contentId], request)) {
+        _spotDetailCache.remove(contentId);
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _fetchSpotDetailsFromNetwork(
+    String contentId,
+  ) async {
     try {
       final response = await retryTransientDio(
         () => _dio.get<Map<String, dynamic>>(
@@ -149,6 +169,16 @@ class CourseRepository {
       final error = e.error;
       if (error is ApiException) throw error;
       throw ApiException(message: e.message ?? 'Failed to fetch place details');
+    }
+  }
+
+  /// 현재 선택된 코스의 상세정보만 세션 메모리에 미리 준비합니다.
+  /// 디스크나 서버 DB에는 저장하지 않으며 실패한 요청은 캐시에서 제거됩니다.
+  void prefetchSpotDetails(Iterable<CourseSpot> spots) {
+    for (final spot in spots.where(
+      (spot) => spot.source == 'TOUR_API_REALTIME',
+    )) {
+      unawaited(fetchSpotDetails(spot.id).catchError((_) => null));
     }
   }
 

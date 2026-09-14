@@ -327,6 +327,34 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 style: const TextStyle(color: AppTheme.textSecondary),
               ),
             ],
+            if (place.petFriendly) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.softMint,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.pets_rounded, size: 15, color: AppTheme.primary),
+                    SizedBox(width: 6),
+                    Text(
+                      '반려동물 동반 정보 제공 장소',
+                      style: TextStyle(
+                        color: AppTheme.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -643,17 +671,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                             ref
                                 .read(mapSearchViewModelProvider.notifier)
                                 .togglePetFriendly(!state.petFriendly);
-                            _search();
-                          },
-                        ),
-                        _FilterChip(
-                          label: '대형 주차장',
-                          icon: Icons.local_parking_rounded,
-                          selected: state.parking,
-                          onTap: () {
-                            ref
-                                .read(mapSearchViewModelProvider.notifier)
-                                .toggleParking(!state.parking);
                             _search();
                           },
                         ),

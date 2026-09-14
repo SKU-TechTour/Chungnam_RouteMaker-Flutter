@@ -63,8 +63,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: const _ImageStorySection(
                         eyebrow: 'WELCOME TO CHUNGNAM',
                         title: '충남의 반가운 얼굴과\n여행을 시작해요',
-                        description:
-                            '공주·부여·논산의 문화와 풍경을\n당신의 취향에 맞게 이어드릴게요.',
+                        description: '공주·부여·논산의 문화와 풍경을\n당신의 취향에 맞게 이어드릴게요.',
                         asset: 'assets/images/onboarding/chungnam_mascots.png',
                         accent: Color(0xFFF28A42),
                       ),
@@ -75,8 +74,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: const _ImageStorySection(
                         eyebrow: 'ROUTE FOR YOUR MOMENT',
                         title: '입영의 하루부터\n가벼운 주말 여행까지',
-                        description:
-                            '입영객과 동행 지인, 일반 여행객까지\n상황에 맞는 동선을 골라드려요.',
+                        description: '입영객과 동행 지인, 일반 여행객까지\n상황에 맞는 동선을 골라드려요.',
                         asset: 'assets/images/onboarding/travelers.png',
                         accent: AppTheme.primary,
                         imageFirst: false,
@@ -317,21 +315,17 @@ class _AppPreviewSection extends StatelessWidget {
       SizedBox(
         height: 430,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Expanded(
-              flex: 6,
               child: _PhonePreview(
                 asset: 'assets/images/onboarding/home_preview.jpg',
               ),
             ),
             const SizedBox(width: 12),
-            Expanded(
-              flex: 5,
-              child: Transform.translate(
-                offset: const Offset(0, 34),
-                child: const _PhonePreview(
-                  asset: 'assets/images/onboarding/saved_preview.jpg',
-                ),
+            const Expanded(
+              child: _PhonePreview(
+                asset: 'assets/images/onboarding/saved_preview.jpg',
               ),
             ),
           ],
