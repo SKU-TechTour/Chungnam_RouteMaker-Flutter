@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' as fm;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +5,7 @@ import 'package:latlong2/latlong.dart' as ll;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/di/providers.dart';
+import '../widgets/cached_map_tile_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../home_curation/models/course.dart';
 import '../../home_curation/models/selected_route.dart';
@@ -20,9 +19,10 @@ const _regionCenters = {
 };
 
 class MapScreen extends ConsumerStatefulWidget {
-  const MapScreen({super.key, this.initialRoute});
+  const MapScreen({super.key, this.initialRoute, this.tileProvider});
 
   final SelectedRoute? initialRoute;
+  final fm.TileProvider? tileProvider;
 
   @override
   ConsumerState<MapScreen> createState() => _MapScreenState();
@@ -32,90 +32,135 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   final _mapController = fm.MapController();
   bool _locating = false;
   bool _loadingRoadRoute = false;
-  bool _usingFallbackTiles = false;
   bool _tileUnavailable = false;
-  int _fallbackTileErrors = 0;
-  bool _mapInitialized = false;
+  int _tileRevision = 0;
   bool _mapReady = false;
-  Timer? _mapReadyTimer;
+  int _routeGeneration = 0;
+  String? _requestedRouteSignature;
+  String? _displayedRouteSignature;
+  bool _hasStraightConnections = true;
   List<ll.LatLng> _roadPoints = const [];
   List<RouteGuideStep> _routeGuides = const [];
+
+  SelectedRoute? get _selectedRoute =>
+      ref.read(selectedRouteProvider) ?? widget.initialRoute;
+
+  String? _signature(SelectedRoute? route) =>
+      route?.spots.map((s) => '${s.id}:${s.latitude}:${s.longitude}').join('|');
 
   @override
   void initState() {
     super.initState();
-    // 일부 제조사 WebView/GPU 환경에서 onMapReady 콜백이 늦어져도 로딩
-    // 덮개가 영구적으로 화면을 가리지 않게 합니다.
-    _mapReadyTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && !_mapReady) setState(() => _mapReady = true);
-    });
-  }
-
-  void _initializeMap() {
-    if (_mapInitialized || !mounted) return;
-    _mapInitialized = true;
-    _mapReadyTimer?.cancel();
-    setState(() => _mapReady = true);
-
-    final selected = ref.read(selectedRouteProvider) ?? widget.initialRoute;
-    if (selected != null && selected.spots.length > 1) {
-      _mapController.fitCamera(
-        fm.CameraFit.bounds(
-          bounds: fm.LatLngBounds.fromPoints(
-            selected.spots
-                .map((spot) => ll.LatLng(spot.latitude, spot.longitude))
-                .toList(),
-          ),
-          padding: const EdgeInsets.fromLTRB(48, 170, 48, 230),
-        ),
-      );
-      _loadRoadRoute(selected);
-    }
-
-    // 지도가 먼저 그려진 뒤 위치 권한을 요청해 권한 창 뒤에 흰 화면이 남지 않게 합니다.
-    Future<void>.delayed(const Duration(milliseconds: 250), () {
-      if (mounted) {
-        _moveToCurrentLocation(searchNearby: selected == null);
-      }
+    // Neither tile loading nor GPS permission should delay the route request.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncSelectedRoute();
     });
   }
 
   @override
+  void didUpdateWidget(covariant MapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_signature(oldWidget.initialRoute) != _signature(widget.initialRoute)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncSelectedRoute();
+      });
+    }
+  }
+
+  void _initializeMap() {
+    if (!mounted) return;
+    _mapReady = true;
+    _fitSelectedRoute();
+    _moveToCurrentLocation(searchNearby: _selectedRoute == null);
+  }
+
+  void _fitPoints(List<ll.LatLng> points) {
+    if (!_mapReady || points.isEmpty) return;
+    final size = _mapController.camera.nonRotatedSize;
+    _mapController.fitCamera(
+      fm.CameraFit.bounds(
+        bounds: fm.LatLngBounds.fromPoints(points),
+        maxZoom: 16,
+        padding: EdgeInsets.fromLTRB(32, size.y * 0.26, 32, size.y * 0.34),
+      ),
+    );
+  }
+
+  void _fitSelectedRoute() {
+    final route = _selectedRoute;
+    if (route == null) return;
+    _fitPoints([
+      ...route.spots
+          .map(Place.fromCourseSpot)
+          .where(_hasValidCoordinates)
+          .map((p) => ll.LatLng(p.lat, p.lng)),
+      if (_displayedRouteSignature == _signature(route)) ..._roadPoints,
+    ]);
+  }
+
+  void _syncSelectedRoute() {
+    final route = _selectedRoute;
+    final signature = _signature(route);
+    if (signature == _requestedRouteSignature) return;
+    _requestedRouteSignature = signature;
+    ++_routeGeneration;
+    setState(() {
+      _roadPoints = const [];
+      _routeGuides = const [];
+      _displayedRouteSignature = null;
+      _hasStraightConnections = true;
+      _loadingRoadRoute = false;
+    });
+    _fitSelectedRoute();
+    if (route != null && route.spots.length >= 2) _loadRoadRoute(route);
+  }
+
+  @override
   void dispose() {
-    _mapReadyTimer?.cancel();
+    ++_routeGeneration;
+    _mapController.dispose();
     super.dispose();
   }
 
   Future<void> _loadRoadRoute(SelectedRoute route) async {
+    final generation = ++_routeGeneration;
     setState(() => _loadingRoadRoute = true);
     try {
       final metrics = await ref
           .read(courseRepositoryProvider)
           .previewRoute(route.spots);
-      if (!mounted) return;
+      if (!mounted ||
+          generation != _routeGeneration ||
+          _signature(_selectedRoute) != _signature(route)) {
+        return;
+      }
       final roadPoints = metrics.path
-          .map((point) => ll.LatLng(point.latitude, point.longitude))
+          .where(
+            (p) =>
+                p.latitude.isFinite &&
+                p.longitude.isFinite &&
+                p.latitude.abs() <= 90 &&
+                p.longitude.abs() <= 180 &&
+                !(p.latitude == 0 && p.longitude == 0),
+          )
+          .map((p) => ll.LatLng(p.latitude, p.longitude))
           .toList();
       setState(() {
         _roadPoints = roadPoints;
         _routeGuides = metrics.guides;
+        _displayedRouteSignature = _signature(route);
+        _hasStraightConnections =
+            metrics.usesStraightConnections || roadPoints.length < 2;
       });
-      if (roadPoints.length > 1) {
-        _mapController.fitCamera(
-          fm.CameraFit.bounds(
-            bounds: fm.LatLngBounds.fromPoints(roadPoints),
-            padding: const EdgeInsets.fromLTRB(38, 155, 38, 265),
-          ),
-        );
-      }
+      _fitSelectedRoute();
     } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('실제 도로 경로를 불러오지 못해 경유지를 직선으로 표시해요.')),
-        );
+      if (mounted && generation == _routeGeneration) {
+        setState(() => _hasStraightConnections = true);
       }
     } finally {
-      if (mounted) setState(() => _loadingRoadRoute = false);
+      if (mounted && generation == _routeGeneration) {
+        setState(() => _loadingRoadRoute = false);
+      }
     }
   }
 
@@ -181,16 +226,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ref.read(mapSearchViewModelProvider.notifier).searchNearby();
 
   void _onTileError() {
+    if (_tileUnavailable) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (!_usingFallbackTiles) {
-        setState(() => _usingFallbackTiles = true);
-        return;
-      }
-      _fallbackTileErrors++;
-      if (_fallbackTileErrors >= 3 && !_tileUnavailable) {
-        setState(() => _tileUnavailable = true);
-      }
+      if (mounted && !_tileUnavailable) setState(() => _tileUnavailable = true);
+    });
+  }
+
+  void _retryTiles() {
+    setState(() {
+      _tileUnavailable = false;
+      _tileRevision++;
     });
   }
 
@@ -294,6 +339,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       final position = await ref
           .read(locationUtilProvider)
           .getCurrentPosition();
+      if (!mounted) return;
       ref
           .read(mapSearchViewModelProvider.notifier)
           .applyDeviceLocation(position.lat, position.lng);
@@ -308,6 +354,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         ).showSnackBar(const SnackBar(content: Text('현재 위치 주변을 보여드릴게요.')));
       }
     } catch (_) {
+      if (!mounted) return;
       if (searchNearby) await _search();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -390,6 +437,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(selectedRouteProvider, (_, next) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncSelectedRoute();
+      });
+    });
     final state = ref.watch(mapSearchViewModelProvider);
     final selectedRoute =
         ref.watch(selectedRouteProvider) ?? widget.initialRoute;
@@ -407,12 +459,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final points = mappablePlaces
         .map((place) => ll.LatLng(place.lat, place.lng))
         .toList();
-    final routePoints = _roadPoints.length > 1 ? _roadPoints : points;
+    final routePoints =
+        _displayedRouteSignature == _signature(selectedRoute) &&
+            _roadPoints.length > 1
+        ? _roadPoints
+        : points;
 
     return Scaffold(
       body: Stack(
         children: [
-          Positioned.fill(child: _RouteFallbackMap(places: mappablePlaces)),
           Positioned.fill(
             child: fm.FlutterMap(
               mapController: _mapController,
@@ -421,18 +476,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ? points.first
                     : const ll.LatLng(36.4465, 127.1191),
                 initialZoom: 12,
-                backgroundColor: Colors.transparent,
+                backgroundColor: const Color(0xFFF0F4F0),
+                maxZoom: 19,
                 onMapReady: _initializeMap,
               ),
               children: [
                 fm.TileLayer(
-                  key: ValueKey(_usingFallbackTiles),
-                  urlTemplate: _usingFallbackTiles
-                      ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-                      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                  fallbackUrl: _usingFallbackTiles
-                      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
-                      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  key: ValueKey(_tileRevision),
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  tileProvider: widget.tileProvider ?? CachedMapTileProvider(),
+                  maxNativeZoom: 19,
+                  panBuffer: 0,
                   userAgentPackageName: 'com.techtour.flutterprojects',
                   errorTileCallback: (_, _, _) => _onTileError(),
                   evictErrorTileStrategy:
@@ -445,6 +499,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         points: routePoints,
                         color: AppTheme.primary,
                         strokeWidth: 5,
+                        borderColor: Colors.white,
+                        borderStrokeWidth: 2,
                       ),
                     ],
                   ),
@@ -471,36 +527,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       ),
                   ],
                 ),
-                const fm.SimpleAttributionWidget(
-                  source: Text(
-                    'OpenStreetMap contributors · CARTO',
-                    style: TextStyle(fontSize: 9),
-                  ),
-                ),
               ],
             ),
           ),
-          if (_tileUnavailable)
-            Positioned.fill(child: _RouteFallbackMap(places: mappablePlaces)),
-          if (!_mapReady)
-            const Positioned.fill(
-              child: ColoredBox(
-                color: Color(0xFFF4F7F4),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 12),
-                      Text(
-                        '코스 지도를 준비하고 있어요.',
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
           SafeArea(
             child: Column(
               children: [
@@ -632,15 +661,80 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ),
                   ),
                 ],
-                if (state.errorMessage case final message?) ...[
+                if (selectedRoute == null && state.errorMessage != null) ...[
                   const SizedBox(height: 10),
-                  _ApiErrorBanner(message: message, onRetry: _search),
+                  _ApiErrorBanner(
+                    message: state.errorMessage!,
+                    onRetry: _search,
+                  ),
                 ],
-                if (_usingFallbackTiles) ...[
+                if (_tileUnavailable) ...[
                   const SizedBox(height: 8),
-                  const _MapNetworkNotice(),
+                  _ApiErrorBanner(
+                    message: '배경 지도를 불러오지 못했어요. 코스 위치와 연결선은 유지됩니다.',
+                    onRetry: _retryTiles,
+                  ),
+                ],
+                if (selectedRoute != null) ...[
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Material(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _loadingRoadRoute
+                                  ? '경유지를 연결했어요 · 카카오 도로 경로 조회 중'
+                                  : _hasStraightConnections
+                                  ? '경유지 순서대로 직선 연결 · 실제 도로와 다를 수 있어요'
+                                  : '카카오 도로 경로로 연결했어요',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: '전체 코스 보기',
+                            onPressed: _fitSelectedRoute,
+                            icon: const Icon(
+                              Icons.zoom_out_map_rounded,
+                              size: 18,
+                            ),
+                          ),
+                          if (!_loadingRoadRoute && _hasStraightConnections)
+                            IconButton(
+                              tooltip: '도로 경로 재시도',
+                              onPressed: () => _loadRoadRoute(selectedRoute),
+                              icon: const Icon(Icons.refresh_rounded, size: 18),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
                 const Spacer(),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    child: GestureDetector(
+                      onTap: () => launchUrl(
+                        Uri.parse('https://www.openstreetmap.org/copyright'),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                      child: const Text(
+                        '© OpenStreetMap contributors',
+                        style: TextStyle(fontSize: 10),
+                      ),
+                    ),
+                  ),
+                ),
                 if (selectedRoute != null)
                   _JourneyControlCard(
                     progress: activeJourney,
@@ -676,126 +770,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       place.lng >= -180 &&
       place.lng <= 180 &&
       !(place.lat == 0 && place.lng == 0);
-}
-
-class _RouteFallbackMap extends StatelessWidget {
-  const _RouteFallbackMap({required this.places});
-
-  final List<Place> places;
-
-  @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: const Color(0xFFF0F4F0),
-    child: Stack(
-      children: [
-        Positioned.fill(
-          child: CustomPaint(painter: _RouteSketchPainter(places)),
-        ),
-        Positioned(
-          top: MediaQuery.paddingOf(context).top + 102,
-          left: 24,
-          right: 24,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.94),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.divider),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.map_outlined, size: 18, color: AppTheme.primary),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '지도 연결이 지연되어 코스 위치를 간이 지도로 표시합니다.',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _RouteSketchPainter extends CustomPainter {
-  const _RouteSketchPainter(this.places);
-
-  final List<Place> places;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = const Color(0xFFDCE5DE)
-      ..strokeWidth = 1;
-    for (double x = 0; x < size.width; x += 42) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
-    }
-    for (double y = 0; y < size.height; y += 42) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-    if (places.isEmpty) return;
-
-    final minLat = places
-        .map((place) => place.lat)
-        .reduce((a, b) => a < b ? a : b);
-    final maxLat = places
-        .map((place) => place.lat)
-        .reduce((a, b) => a > b ? a : b);
-    final minLng = places
-        .map((place) => place.lng)
-        .reduce((a, b) => a < b ? a : b);
-    final maxLng = places
-        .map((place) => place.lng)
-        .reduce((a, b) => a > b ? a : b);
-    final latSpan = (maxLat - minLat).abs();
-    final lngSpan = (maxLng - minLng).abs();
-    final usableWidth = (size.width - 96).clamp(1.0, double.infinity);
-    final usableHeight = (size.height - 300).clamp(1.0, double.infinity);
-    final offsets = places.map((place) {
-      final xRatio = lngSpan < 0.000001 ? 0.5 : (place.lng - minLng) / lngSpan;
-      final yRatio = latSpan < 0.000001 ? 0.5 : (maxLat - place.lat) / latSpan;
-      return Offset(48 + usableWidth * xRatio, 175 + usableHeight * yRatio);
-    }).toList();
-
-    final routePaint = Paint()
-      ..color = AppTheme.primary.withValues(alpha: 0.72)
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    if (offsets.length > 1) {
-      final path = Path()..moveTo(offsets.first.dx, offsets.first.dy);
-      for (final point in offsets.skip(1)) {
-        path.lineTo(point.dx, point.dy);
-      }
-      canvas.drawPath(path, routePaint);
-    }
-
-    for (var index = 0; index < offsets.length; index++) {
-      final point = offsets[index];
-      canvas.drawCircle(point, 18, Paint()..color = Colors.white);
-      canvas.drawCircle(point, 15, Paint()..color = AppTheme.primary);
-      final label = TextPainter(
-        text: TextSpan(
-          text: '${index + 1}',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      label.paint(canvas, point - Offset(label.width / 2, label.height / 2));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _RouteSketchPainter oldDelegate) =>
-      oldDelegate.places != places;
 }
 
 class _JourneyControlCard extends StatelessWidget {
@@ -1007,36 +981,6 @@ class _ApiErrorBanner extends StatelessWidget {
           ),
         ),
         TextButton(onPressed: onRetry, child: const Text('재시도')),
-      ],
-    ),
-  );
-}
-
-class _MapNetworkNotice extends StatelessWidget {
-  const _MapNetworkNotice();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.symmetric(horizontal: 16),
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.94),
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10),
-      ],
-    ),
-    child: const Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.map_outlined, size: 16, color: AppTheme.primary),
-        SizedBox(width: 7),
-        Flexible(
-          child: Text(
-            '기본 지도 연결이 불안정해 대체 지도를 표시하고 있어요.',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-          ),
-        ),
       ],
     ),
   );

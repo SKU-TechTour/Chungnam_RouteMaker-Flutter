@@ -174,15 +174,52 @@ class CourseRepository {
         throw const ApiException(message: 'Invalid route preview response');
       }
       final routes = data['routes'] as List<dynamic>? ?? const [];
-      final path = routes
-          .expand(
-            (route) =>
-                ((route as Map<String, dynamic>)['path'] as List<dynamic>? ??
-                const []),
-          )
-          .whereType<Map<String, dynamic>>()
-          .map(RoutePathPoint.fromJson)
-          .toList();
+      final path = <RoutePathPoint>[];
+      var usesStraightConnections = false;
+      // Match each response leg to the selected pair. Flattening only successful
+      // legs can silently omit a stop or join unrelated roads.
+      for (var index = 0; index + 1 < spots.length; index++) {
+        final origin = spots[index];
+        final destination = spots[index + 1];
+        final matchingLegs = routes.whereType<Map<String, dynamic>>().where(
+          (leg) =>
+              leg['originPlaceId']?.toString() == origin.id &&
+              leg['destinationPlaceId']?.toString() == destination.id,
+        );
+        final leg = matchingLegs.isEmpty ? null : matchingLegs.first;
+        final coordinates = (leg?['path'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .where(
+              (point) => point['latitude'] is num && point['longitude'] is num,
+            )
+            .map(RoutePathPoint.fromJson)
+            .where(
+              (p) =>
+                  p.latitude.isFinite &&
+                  p.longitude.isFinite &&
+                  p.latitude.abs() <= 90 &&
+                  p.longitude.abs() <= 180 &&
+                  !(p.latitude == 0 && p.longitude == 0),
+            )
+            .toList();
+        path.add(
+          RoutePathPoint(
+            latitude: origin.latitude,
+            longitude: origin.longitude,
+          ),
+        );
+        if (coordinates.length >= 2) {
+          path.addAll(coordinates);
+        } else {
+          usesStraightConnections = true;
+        }
+        path.add(
+          RoutePathPoint(
+            latitude: destination.latitude,
+            longitude: destination.longitude,
+          ),
+        );
+      }
       final guides = routes
           .expand(
             (route) =>
@@ -197,6 +234,7 @@ class CourseRepository {
         durationSeconds: (data['totalDurationSeconds'] as num?)?.round() ?? 0,
         path: path,
         guides: guides,
+        usesStraightConnections: usesStraightConnections,
       );
     } on DioException catch (e) {
       final error = e.error;

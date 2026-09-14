@@ -22,12 +22,14 @@ class RouteMetrics {
     required this.durationSeconds,
     this.path = const [],
     this.guides = const [],
+    this.usesStraightConnections = false,
   });
 
   final int distanceMeters;
   final int durationSeconds;
   final List<RoutePathPoint> path;
   final List<RouteGuideStep> guides;
+  final bool usesStraightConnections;
 }
 
 class RoutePathPoint {
