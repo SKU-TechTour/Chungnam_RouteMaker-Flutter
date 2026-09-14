@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' as fm;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,6 +37,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   int _tileRevision = 0;
   bool _mapReady = false;
   int _routeGeneration = 0;
+  Timer? _roadRouteTimer;
   String? _requestedRouteSignature;
   String? _displayedRouteSignature;
   bool _hasStraightConnections = true;
@@ -111,12 +114,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _loadingRoadRoute = false;
     });
     _fitSelectedRoute();
-    if (route != null && route.spots.length >= 2) _loadRoadRoute(route);
+    if (route != null && route.spots.length >= 2) {
+      // 먼저 선택 경유지와 직선 연결을 한 프레임 그린 뒤 도로 경로를
+      // 요청한다. 네트워크/JSON 처리가 지도 첫 화면을 막지 않게 한다.
+      _roadRouteTimer?.cancel();
+      _roadRouteTimer = Timer(const Duration(milliseconds: 450), () {
+        if (mounted && _signature(_selectedRoute) == signature) {
+          _loadRoadRoute(route);
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
     ++_routeGeneration;
+    _roadRouteTimer?.cancel();
     _mapController.dispose();
     super.dispose();
   }
@@ -133,7 +146,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           _signature(_selectedRoute) != _signature(route)) {
         return;
       }
-      final roadPoints = metrics.path
+      final allRoadPoints = metrics.path
           .where(
             (p) =>
                 p.latitude.isFinite &&
@@ -144,6 +157,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           )
           .map((p) => ll.LatLng(p.latitude, p.longitude))
           .toList();
+      final roadPoints = _limitPathPoints(allRoadPoints);
       setState(() {
         _roadPoints = roadPoints;
         _routeGuides = metrics.guides;
@@ -789,6 +803,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       place.lng >= -180 &&
       place.lng <= 180 &&
       !(place.lat == 0 && place.lng == 0);
+
+  List<ll.LatLng> _limitPathPoints(List<ll.LatLng> points) {
+    const maximum = 700;
+    if (points.length <= maximum) return points;
+    final stride = (points.length / (maximum - 1)).ceil();
+    final reduced = <ll.LatLng>[
+      for (var index = 0; index < points.length - 1; index += stride)
+        points[index],
+      points.last,
+    ];
+    return reduced;
+  }
 }
 
 class _JourneyControlCard extends StatelessWidget {

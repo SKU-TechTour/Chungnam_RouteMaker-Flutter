@@ -121,6 +121,10 @@ void main() {
     final repository = _ControlledRepository();
     final route = _testRoute('first', 36.1);
     await _showMap(tester, route, repository);
+    expect(
+      repository.requestedSpots.single.map((spot) => spot.id),
+      route.spots.map((spot) => spot.id),
+    );
     final lineBefore = tester
         .widget<fm.PolylineLayer>(find.byType(fm.PolylineLayer))
         .polylines
@@ -168,7 +172,7 @@ void main() {
     final container = ProviderScope.containerOf(element);
     container.read(selectedRouteProvider.notifier).state = second;
     await tester.pump();
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     expect(repository.requests.length, 2);
     final road = [
       const RoutePathPoint(latitude: 36.4, longitude: 127.1),
@@ -218,7 +222,7 @@ Future<void> _showMap(
     ),
   );
   await tester.pump();
-  await tester.pump(const Duration(milliseconds: 300));
+  await tester.pump(const Duration(milliseconds: 600));
 }
 
 SelectedRoute _testRoute(String id, double latitude) => SelectedRoute(
@@ -249,10 +253,12 @@ class _MemoryTiles extends fm.TileProvider {
 class _ControlledRepository extends CourseRepository {
   _ControlledRepository() : super(Dio());
   final requests = <Completer<RouteMetrics>>[];
+  final requestedSpots = <List<CourseSpot>>[];
   @override
   Future<RouteMetrics> previewRoute(List<CourseSpot> spots) {
     final request = Completer<RouteMetrics>();
     requests.add(request);
+    requestedSpots.add(List.unmodifiable(spots));
     return request.future;
   }
 }
