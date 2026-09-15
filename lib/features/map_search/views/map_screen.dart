@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/external_map_buttons.dart';
 import '../../home_curation/models/course.dart';
 import '../../home_curation/models/selected_route.dart';
 import '../viewmodels/journey_progress_provider.dart';
@@ -368,6 +369,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 18),
+            ExternalMapButtons(
+              name: place.name,
+              latitude: place.lat,
+              longitude: place.lng,
+            ),
           ],
         ),
       ),

@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/external_map_buttons.dart';
 import '../../../core/widgets/route_maker_logo.dart';
 import '../../saved/models/saved_course.dart';
 import '../../saved/viewmodels/saved_courses_provider.dart';
@@ -1592,6 +1593,14 @@ class _SpotDetailSheet extends StatelessWidget {
               );
             },
           ),
+          if (spot != null) ...[
+            const SizedBox(height: 18),
+            ExternalMapButtons(
+              name: spot!.name,
+              latitude: spot!.latitude,
+              longitude: spot!.longitude,
+            ),
+          ],
           const SizedBox(height: 14),
           Row(
             children: [
