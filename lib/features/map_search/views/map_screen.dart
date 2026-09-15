@@ -536,7 +536,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   evictErrorTileStrategy:
                       fm.EvictErrorTileStrategy.notVisibleRespectMargin,
                 ),
-                if (routePoints.length > 1)
+                if (selectedRoute != null && routePoints.length > 1)
                   fm.PolylineLayer(
                     polylines: [
                       fm.Polyline(
@@ -783,10 +783,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         ? null
                         : _showRouteGuides,
                   ),
-                _RoutePreview(
-                  places: places,
-                  isLoading: selectedRoute == null && state.isLoading,
-                ),
+                if (selectedRoute != null)
+                  _RoutePreview(places: places, isLoading: false),
               ],
             ),
           ),

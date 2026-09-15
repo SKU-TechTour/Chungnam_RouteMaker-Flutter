@@ -30,24 +30,39 @@ final appRouter = GoRouter(
     ShellRoute(
       builder: (context, state, child) => MainShell(child: child),
       routes: [
-        GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
-        GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
+        GoRoute(
+          path: '/home',
+          pageBuilder: (context, state) =>
+              NoTransitionPage(key: state.pageKey, child: const HomeScreen()),
+        ),
+        GoRoute(
+          path: '/map',
+          pageBuilder: (context, state) =>
+              NoTransitionPage(key: state.pageKey, child: const MapScreen()),
+        ),
         GoRoute(
           path: '/map/route',
-          builder: (context, state) => MapScreen(
-            key: ValueKey(state.extra),
-            initialRoute: state.extra is SelectedRoute
-                ? state.extra! as SelectedRoute
-                : null,
+          pageBuilder: (context, state) => NoTransitionPage(
+            key: state.pageKey,
+            child: MapScreen(
+              key: ValueKey(state.extra),
+              initialRoute: state.extra is SelectedRoute
+                  ? state.extra! as SelectedRoute
+                  : null,
+            ),
           ),
         ),
         GoRoute(
           path: '/saved',
-          builder: (context, state) => const SavedScreen(),
+          pageBuilder: (context, state) =>
+              NoTransitionPage(key: state.pageKey, child: const SavedScreen()),
         ),
         GoRoute(
           path: '/history',
-          builder: (context, state) => const MyHistoryScreen(),
+          pageBuilder: (context, state) => NoTransitionPage(
+            key: state.pageKey,
+            child: const MyHistoryScreen(),
+          ),
         ),
       ],
     ),

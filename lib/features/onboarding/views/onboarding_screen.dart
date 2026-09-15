@@ -57,7 +57,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     const SizedBox(height: 10),
                     const _OpeningSection(),
-                    const SizedBox(height: 72),
+                    const SizedBox(height: 42),
                     _RevealOnScroll(
                       progress: _revealProgress(150),
                       child: const _ImageStorySection(
@@ -67,9 +67,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         asset:
                             'assets/images/onboarding/chungnam_route_map.png',
                         accent: Color(0xFFF28A42),
+                        imagePadding: EdgeInsets.zero,
+                        imageFit: BoxFit.cover,
                       ),
                     ),
-                    const SizedBox(height: 84),
+                    const SizedBox(height: 60),
                     _RevealOnScroll(
                       progress: _revealProgress(620),
                       child: const _ImageStorySection(
@@ -201,6 +203,8 @@ class _ImageStorySection extends StatelessWidget {
     required this.asset,
     required this.accent,
     this.imageFirst = true,
+    this.imagePadding = const EdgeInsets.all(18),
+    this.imageFit = BoxFit.contain,
   });
 
   final String eyebrow;
@@ -209,19 +213,22 @@ class _ImageStorySection extends StatelessWidget {
   final String asset;
   final Color accent;
   final bool imageFirst;
+  final EdgeInsets imagePadding;
+  final BoxFit imageFit;
 
   @override
   Widget build(BuildContext context) {
     final image = Container(
       height: 310,
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: imagePadding,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(34),
         border: Border.all(color: accent.withValues(alpha: 0.12)),
       ),
-      child: Image.asset(asset, fit: BoxFit.contain),
+      child: Image.asset(asset, fit: imageFit),
     );
     final copy = Column(
       crossAxisAlignment: CrossAxisAlignment.start,

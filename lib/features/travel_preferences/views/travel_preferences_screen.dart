@@ -78,7 +78,7 @@ class _TravelPreferencesScreenState extends State<TravelPreferencesScreen> {
             ),
             const SizedBox(height: 22),
             const Text(
-              '누구의 논산 여정인가요?',
+              '누구의 충남 여행인가요?',
               style: TextStyle(
                 fontSize: 28,
                 height: 1.2,

@@ -11,9 +11,31 @@ import 'package:flutterprojects/features/home_curation/models/course.dart';
 import 'package:flutterprojects/features/home_curation/models/selected_route.dart';
 import 'package:flutterprojects/features/home_curation/repositories/course_repository.dart';
 import 'package:flutterprojects/features/map_search/views/map_screen.dart';
+import 'package:flutterprojects/features/map_search/models/place.dart';
+import 'package:flutterprojects/features/map_search/repositories/place_repository.dart';
 import 'package:go_router/go_router.dart';
 
 void main() {
+  testWidgets('일반 주변 코스는 장소 핀만 표시하고 임의의 연결선을 만들지 않는다', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          placeRepositoryProvider.overrideWithValue(_FakePlaceRepository()),
+          locationUtilProvider.overrideWithValue(const _FakeLocationUtil()),
+        ],
+        child: MaterialApp(home: MapScreen(tileProvider: _MemoryTiles())),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.byType(fm.FlutterMap), findsOneWidget);
+    expect(find.byType(fm.PolylineLayer), findsNothing);
+    expect(find.text('오늘의 연결 코스'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('선택한 코스로 지도 화면에 진입하면 경유지와 시작 버튼이 표시된다', (tester) async {
     final route = SelectedRoute(
       title: '논산 입영 테스트 코스',
@@ -269,6 +291,28 @@ class _FakeCourseRepository extends CourseRepository {
   @override
   Future<RouteMetrics> previewRoute(List<CourseSpot> spots) async =>
       const RouteMetrics(distanceMeters: 14826, durationSeconds: 1669);
+}
+
+class _FakePlaceRepository extends PlaceRepository {
+  _FakePlaceRepository() : super(Dio());
+
+  @override
+  Future<List<Place>> filterPlaces(PlaceFilterRequest request) async => const [
+    Place(
+      id: 'nearby-1',
+      name: '주변 장소 1',
+      type: PlaceType.tourist,
+      lat: 36.45,
+      lng: 127.12,
+    ),
+    Place(
+      id: 'nearby-2',
+      name: '주변 장소 2',
+      type: PlaceType.cafe,
+      lat: 36.46,
+      lng: 127.13,
+    ),
+  ];
 }
 
 class _FakeLocationUtil extends LocationUtil {

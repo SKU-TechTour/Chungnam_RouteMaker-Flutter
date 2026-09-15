@@ -119,27 +119,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 22),
             Row(
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () async {
-                      await preferences.setInt(
-                        _publicDataNoticeHiddenUntilKey,
-                        DateTime.now()
-                            .add(const Duration(days: 1))
-                            .millisecondsSinceEpoch,
-                      );
-                      if (dialogContext.mounted) {
-                        Navigator.pop(dialogContext);
-                      }
-                    },
-                    child: const FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text('1일간 보지 않기'),
+                TextButton(
+                  onPressed: () async {
+                    await preferences.setInt(
+                      _publicDataNoticeHiddenUntilKey,
+                      DateTime.now()
+                          .add(const Duration(days: 1))
+                          .millisecondsSinceEpoch,
+                    );
+                    if (dialogContext.mounted) {
+                      Navigator.pop(dialogContext);
+                    }
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    textStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
+                  child: const Text('1일간 보지 않기'),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
+                const Spacer(),
+                SizedBox(
+                  width: 104,
                   child: FilledButton(
                     onPressed: () => Navigator.pop(dialogContext),
                     child: const Text('확인'),
