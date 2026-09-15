@@ -111,7 +111,9 @@ class SavedCourse {
   );
 
   bool hasSameRoute(SavedCourse other) {
-    if (id != other.id || spots.length != other.spots.length) return false;
+    if (routeKey != other.routeKey || spots.length != other.spots.length) {
+      return false;
+    }
     for (var index = 0; index < spots.length; index++) {
       if (spots[index].id != other.spots[index].id) return false;
     }

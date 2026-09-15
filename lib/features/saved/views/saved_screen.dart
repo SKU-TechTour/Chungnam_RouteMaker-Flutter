@@ -61,7 +61,7 @@ class SavedScreen extends ConsumerWidget {
                     onStart: () {
                       final route = entry.value.toSelectedRoute();
                       ref.read(selectedRouteProvider.notifier).state = route;
-                      context.go('/map', extra: route);
+                      context.go('/map/route', extra: route);
                     },
                   ),
                 ),

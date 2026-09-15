@@ -65,7 +65,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         title: '충남의 세 도시를 잇는\n여행을 시작해요',
                         description: '공주·부여·논산의 문화와 풍경을\n당신의 취향에 맞게 이어드릴게요.',
                         asset:
-                            'assets/images/brand/chungnam_route_maker_logo.png',
+                            'assets/images/onboarding/chungnam_route_map.png',
                         accent: Color(0xFFF28A42),
                       ),
                     ),
@@ -76,7 +76,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         eyebrow: 'ROUTE FOR YOUR MOMENT',
                         title: '입영의 하루부터\n가벼운 주말 여행까지',
                         description: '입영객과 동행 지인, 일반 여행객까지\n상황에 맞는 동선을 골라드려요.',
-                        asset: 'assets/images/onboarding/travelers.png',
+                        asset:
+                            'assets/images/brand/chungnam_route_maker_logo.png',
                         accent: AppTheme.primary,
                         imageFirst: false,
                       ),

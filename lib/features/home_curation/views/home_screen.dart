@@ -30,7 +30,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   static const _publicDataNoticeHiddenUntilKey =
       'public_data_notice_hidden_until';
   static bool _noticeShownThisSession = false;
-  static bool _initialLoadingShownThisSession = false;
 
   var _regionIndex = 0;
   var _party = TravelParty.traveler;
@@ -67,9 +66,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _initializeHome() async {
-    await _showPublicDataNoticeIfNeeded();
+    final preferences = await _preferencesRepository.load();
     if (!mounted) return;
-    await _loadPreferences(showInitialLoading: true);
+    if (preferences != null) {
+      setState(() {
+        _party = preferences.party;
+        _duration = preferences.duration;
+        _routeTemplate = preferences.routeTemplate;
+        _concepts = preferences.concepts;
+      });
+    }
+    final existing = ref.read(homeSessionProvider);
+    final canReuseSession =
+        existing != null &&
+        (preferences == null ||
+            existing.preferenceSignature ==
+                travelPreferenceSignature(preferences));
+
+    // 공공데이터 안내를 읽는 동안 API 요청을 먼저 시작한다. 안내 확인 뒤에도
+    // 응답이 남아 있을 때만 진행률 팝업을 이어서 보여준다.
+    final pendingLoad = canReuseSession ? null : _loadRegion();
+    await _showPublicDataNoticeIfNeeded();
+    if (!mounted || pendingLoad == null) return;
+    await _loadRegionWithDelayedDialog(pendingLoad: pendingLoad);
   }
 
   Future<void> _showPublicDataNoticeIfNeeded() async {
@@ -90,63 +109,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           textAlign: TextAlign.center,
           style: TextStyle(fontWeight: FontWeight.w900),
         ),
-        content: const Text(
-          '본 앱은 한국관광공사 TourAPI와 기상청 예보 등 공공데이터를 실시간으로 조합해 정보를 제공합니다. 기관의 갱신 시점과 현장 상황에 따라 운영시간, 날씨, 이동 정보가 실제와 다를 수 있으니 방문 전 공식 정보를 한 번 더 확인해주세요.',
-          style: TextStyle(height: 1.55),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '본 앱은 한국관광공사 TourAPI와 기상청 예보 등 공공데이터를 실시간으로 조합해 정보를 제공합니다. 기관의 갱신 시점과 현장 상황에 따라 운영시간, 날씨, 이동 정보가 실제와 다를 수 있으니 방문 전 공식 정보를 한 번 더 확인해주세요.',
+              style: TextStyle(height: 1.55),
+            ),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      await preferences.setInt(
+                        _publicDataNoticeHiddenUntilKey,
+                        DateTime.now()
+                            .add(const Duration(days: 1))
+                            .millisecondsSinceEpoch,
+                      );
+                      if (dialogContext.mounted) {
+                        Navigator.pop(dialogContext);
+                      }
+                    },
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('1일간 보지 않기'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text('확인'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await preferences.setInt(
-                _publicDataNoticeHiddenUntilKey,
-                DateTime.now()
-                    .add(const Duration(days: 1))
-                    .millisecondsSinceEpoch,
-              );
-              if (dialogContext.mounted) Navigator.pop(dialogContext);
-            },
-            child: const Text('1일간 보지 않기'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('확인'),
-          ),
-        ],
       ),
     );
   }
 
-  Future<void> _loadPreferences({bool showInitialLoading = false}) async {
-    final preferences = await _preferencesRepository.load();
-    if (!mounted) return;
-    if (preferences != null) {
-      setState(() {
-        _party = preferences.party;
-        _duration = preferences.duration;
-        _routeTemplate = preferences.routeTemplate;
-        _concepts = preferences.concepts;
-      });
-    }
-    final existing = ref.read(homeSessionProvider);
-    if (existing != null &&
-        (preferences == null ||
-            existing.preferenceSignature ==
-                travelPreferenceSignature(preferences))) {
-      return;
-    }
-    if (showInitialLoading && !_initialLoadingShownThisSession) {
-      _initialLoadingShownThisSession = true;
-      await _loadWithInitialDialog();
-    } else {
-      await _loadRegionWithDelayedDialog();
-    }
-  }
-
-  Future<void> _loadWithInitialDialog() async {
-    await _loadRegionWithDelayedDialog();
-  }
-
-  Future<bool> _loadRegionWithDelayedDialog({bool forceRefresh = false}) async {
+  Future<bool> _loadRegionWithDelayedDialog({
+    bool forceRefresh = false,
+    Future<bool>? pendingLoad,
+  }) async {
     final progress = ValueNotifier<_InitialLoadProgress>(
       const _InitialLoadProgress(
         value: 0.12,
@@ -168,7 +178,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         },
       );
     });
-    final loadFuture = _loadRegion(forceRefresh: forceRefresh);
+    final loadFuture = pendingLoad ?? _loadRegion(forceRefresh: forceRefresh);
     final completedWithinOneSecond = await Future.any<bool>([
       loadFuture.then((_) => true),
       Future<bool>.delayed(const Duration(seconds: 1), () => false),
@@ -385,17 +395,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     required String category,
     CourseSpot? spot,
   }) {
+    final details = spot != null && spot.source == 'TOUR_API_REALTIME'
+        ? ref.read(courseRepositoryProvider).fetchSpotDetails(spot.id)
+        : Future<Map<String, dynamic>?>.value(null);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _SpotDetailSheet(
         name: name,
         category: category,
         spot: spot,
-        details: spot != null && spot.source == 'TOUR_API_REALTIME'
-            ? ref.read(courseRepositoryProvider).fetchSpotDetails(spot.id)
-            : Future.value(null),
+        details: details,
       ),
     );
   }
@@ -504,7 +516,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     onStart: (course) {
                       final route = course.toSelectedRoute();
                       ref.read(selectedRouteProvider.notifier).state = route;
-                      context.go('/map', extra: route);
+                      context.go('/map/route', extra: route);
                     },
                   ),
                   const SizedBox(height: 26),
@@ -761,7 +773,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                 )
                                                 .state =
                                             route;
-                                        context.go('/map', extra: route);
+                                        context.go('/map/route', extra: route);
                                       }
                                     : _loadRegion,
                                 icon: const Icon(Icons.navigation_rounded),
@@ -789,14 +801,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-class _PopularCoursesSection extends StatelessWidget {
+class _PopularCoursesSection extends ConsumerWidget {
   const _PopularCoursesSection({required this.courses, required this.onStart});
 
   final AsyncValue<List<SavedCourse>> courses;
   final ValueChanged<SavedCourse> onStart;
 
   @override
-  Widget build(BuildContext context) => Column(
+  Widget build(BuildContext context, WidgetRef ref) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       const Row(
@@ -831,16 +843,24 @@ class _PopularCoursesSection extends StatelessWidget {
                     .toList(growable: false)
                     .asMap()
                     .entries
-                    .map(
-                      (entry) => Padding(
+                    .map((entry) {
+                      final course = entry.value;
+                      final isSaved = ref
+                          .watch(savedCoursesProvider)
+                          .any((saved) => saved.routeKey == course.routeKey);
+                      final routeLabel = course.spots
+                          .take(3)
+                          .map((spot) => spot.name)
+                          .join(' → ');
+                      return Padding(
                         padding: const EdgeInsets.only(bottom: 9),
                         child: Material(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(18),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(18),
-                            onTap: entry.value.spots.length >= 2
-                                ? () => onStart(entry.value)
+                            onTap: course.spots.length >= 2
+                                ? () => onStart(course)
                                 : null,
                             child: Padding(
                               padding: const EdgeInsets.all(14),
@@ -869,7 +889,7 @@ class _PopularCoursesSection extends StatelessWidget {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          entry.value.title,
+                                          routeLabel,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
@@ -877,7 +897,9 @@ class _PopularCoursesSection extends StatelessWidget {
                                           ),
                                         ),
                                         Text(
-                                          '${entry.value.region} · ${entry.value.spots.length}개 경유지',
+                                          '${course.title} · ${course.spots.length}개 경유지',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
                                             color: AppTheme.textSecondary,
                                             fontSize: 11,
@@ -886,28 +908,46 @@ class _PopularCoursesSection extends StatelessWidget {
                                       ],
                                     ),
                                   ),
-                                  const Icon(
-                                    Icons.bookmark_rounded,
-                                    color: AppTheme.primary,
-                                    size: 18,
+                                  IconButton(
+                                    tooltip: isSaved ? '찜 해제' : '이 코스 찜하기',
+                                    onPressed: () {
+                                      ref
+                                          .read(savedCoursesProvider.notifier)
+                                          .toggle(course);
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            isSaved
+                                                ? '인기 코스 찜을 해제했어요.'
+                                                : '인기 코스를 찜했어요.',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: Icon(
+                                      isSaved
+                                          ? Icons.bookmark_rounded
+                                          : Icons.bookmark_border_rounded,
+                                      color: AppTheme.primary,
+                                      size: 20,
+                                    ),
                                   ),
-                                  const SizedBox(width: 4),
                                   Text(
-                                    '${entry.value.bookmarkCount}',
+                                    '${course.bookmarkCount}',
                                     style: const TextStyle(
                                       color: AppTheme.primary,
                                       fontWeight: FontWeight.w900,
                                     ),
                                   ),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.chevron_right_rounded),
                                 ],
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    )
+                      );
+                    })
                     .toList(growable: false),
               ),
       ),
@@ -1412,9 +1452,7 @@ class _SpotDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * 0.94,
-    ),
+    height: MediaQuery.sizeOf(context).height * 0.82,
     padding: EdgeInsets.fromLTRB(
       22,
       12,

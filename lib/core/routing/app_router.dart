@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutterprojects/features/splash/views/splash_screen.dart';
 import 'package:flutterprojects/features/onboarding/views/onboarding_screen.dart';
@@ -30,9 +31,11 @@ final appRouter = GoRouter(
       builder: (context, state, child) => MainShell(child: child),
       routes: [
         GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
+        GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
         GoRoute(
-          path: '/map',
+          path: '/map/route',
           builder: (context, state) => MapScreen(
+            key: ValueKey(state.extra),
             initialRoute: state.extra is SelectedRoute
                 ? state.extra! as SelectedRoute
                 : null,

@@ -59,7 +59,7 @@ class SavedCoursesNotifier extends StateNotifier<List<SavedCourse>> {
 
   void toggle(SavedCourse course) {
     _changedBeforeLoad = true;
-    final index = state.indexWhere((item) => item.id == course.id);
+    final index = state.indexWhere((item) => item.routeKey == course.routeKey);
     if (index < 0) {
       state = [...state, course];
       unawaited(_save());
@@ -68,7 +68,7 @@ class SavedCoursesNotifier extends StateNotifier<List<SavedCourse>> {
     }
     if (state[index].hasSameRoute(course)) {
       final removed = state[index];
-      state = state.where((item) => item.id != course.id).toList();
+      state = state.where((item) => item.routeKey != course.routeKey).toList();
       unawaited(_save());
       unawaited(_sync(() => _remote.remove(removed)));
       return;

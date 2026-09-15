@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/di/providers.dart';
 import '../../../core/theme/app_theme.dart';
 
-class MainShell extends StatelessWidget {
+class MainShell extends ConsumerWidget {
   const MainShell({super.key, required this.child});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).uri.path;
     return Scaffold(
       body: child,
@@ -35,7 +37,12 @@ class MainShell extends StatelessWidget {
               final selected = _indexFromPath(location) == index;
               return Expanded(
                 child: InkWell(
-                  onTap: () => context.go(item.path),
+                  onTap: () {
+                    if (item.path == '/map') {
+                      ref.read(selectedRouteProvider.notifier).state = null;
+                    }
+                    context.go(item.path);
+                  },
                   borderRadius: BorderRadius.circular(18),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),

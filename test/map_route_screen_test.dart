@@ -56,7 +56,7 @@ void main() {
                 child: FilledButton(
                   onPressed: () {
                     ref.read(selectedRouteProvider.notifier).state = route;
-                    context.go('/map', extra: route);
+                    context.go('/map/route', extra: route);
                   },
                   child: const Text('이 루트 시작하기'),
                 ),
@@ -65,7 +65,7 @@ void main() {
           ),
         ),
         GoRoute(
-          path: '/map',
+          path: '/map/route',
           builder: (context, state) => MapScreen(
             tileProvider: _MemoryTiles(),
             initialRoute: state.extra is SelectedRoute
