@@ -879,6 +879,11 @@ class _JourneyControlCard extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: AppTheme.primary,
+                    // The app-wide button theme uses Size.fromHeight, whose
+                    // width is infinite. This button lives in a Row, so it
+                    // needs a finite width constraint or the entire map page
+                    // fails layout before markers and polylines can paint.
+                    minimumSize: const Size(68, 44),
                   ),
                   child: const Text('시작'),
                 ),

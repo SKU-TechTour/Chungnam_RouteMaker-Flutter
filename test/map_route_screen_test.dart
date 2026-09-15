@@ -6,6 +6,7 @@ import 'package:flutter_map/flutter_map.dart' as fm;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutterprojects/core/di/providers.dart';
+import 'package:flutterprojects/core/theme/app_theme.dart';
 import 'package:flutterprojects/core/utils/location_util.dart';
 import 'package:flutterprojects/features/home_curation/models/course.dart';
 import 'package:flutterprojects/features/home_curation/models/selected_route.dart';
@@ -24,7 +25,10 @@ void main() {
           placeRepositoryProvider.overrideWithValue(_FakePlaceRepository()),
           locationUtilProvider.overrideWithValue(const _FakeLocationUtil()),
         ],
-        child: MaterialApp(home: MapScreen(tileProvider: _MemoryTiles())),
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: MapScreen(tileProvider: _MemoryTiles()),
+        ),
       ),
     );
     await tester.pump();
@@ -120,7 +124,7 @@ void main() {
           courseRepositoryProvider.overrideWithValue(_FakeCourseRepository()),
           locationUtilProvider.overrideWithValue(const _FakeLocationUtil()),
         ],
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(theme: AppTheme.light, routerConfig: router),
       ),
     );
     await tester.pump();
@@ -255,6 +259,7 @@ Future<void> _showMap(
         locationUtilProvider.overrideWithValue(const _FakeLocationUtil()),
       ],
       child: MaterialApp(
+        theme: AppTheme.light,
         home: MapScreen(initialRoute: route, tileProvider: _MemoryTiles()),
       ),
     ),
