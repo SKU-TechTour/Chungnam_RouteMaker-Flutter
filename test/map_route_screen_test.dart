@@ -10,6 +10,7 @@ import 'package:flutterprojects/core/utils/location_util.dart';
 import 'package:flutterprojects/features/home_curation/models/course.dart';
 import 'package:flutterprojects/features/home_curation/models/selected_route.dart';
 import 'package:flutterprojects/features/home_curation/repositories/course_repository.dart';
+import 'package:flutterprojects/features/home_curation/views/main_shell.dart';
 import 'package:flutterprojects/features/map_search/views/map_screen.dart';
 import 'package:flutterprojects/features/map_search/models/place.dart';
 import 'package:flutterprojects/features/map_search/repositories/place_repository.dart';
@@ -70,30 +71,45 @@ void main() {
     final router = GoRouter(
       initialLocation: '/launch',
       routes: [
-        GoRoute(
-          path: '/launch',
-          builder: (context, state) => Consumer(
-            builder: (context, ref, _) => Material(
-              child: Center(
-                child: FilledButton(
-                  onPressed: () {
-                    ref.read(selectedRouteProvider.notifier).state = route;
-                    context.go('/map/route', extra: route);
-                  },
-                  child: const Text('이 루트 시작하기'),
+        ShellRoute(
+          builder: (context, state, child) => MainShell(child: child),
+          routes: [
+            GoRoute(
+              path: '/launch',
+              builder: (context, state) => Consumer(
+                builder: (context, ref, _) => Material(
+                  child: Center(
+                    child: FilledButton(
+                      onPressed: () {
+                        ref.read(selectedRouteProvider.notifier).state = route;
+                        context.go('/map');
+                      },
+                      child: const Text('이 루트 시작하기'),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-        GoRoute(
-          path: '/map/route',
-          builder: (context, state) => MapScreen(
-            tileProvider: _MemoryTiles(),
-            initialRoute: state.extra is SelectedRoute
-                ? state.extra! as SelectedRoute
-                : null,
-          ),
+            GoRoute(
+              path: '/map',
+              pageBuilder: (context, state) => NoTransitionPage(
+                key: state.pageKey,
+                child: MapScreen(tileProvider: _MemoryTiles()),
+              ),
+            ),
+            GoRoute(
+              path: '/home',
+              builder: (_, _) => const Scaffold(body: Text('홈 화면')),
+            ),
+            GoRoute(
+              path: '/saved',
+              builder: (_, _) => const Scaffold(body: Text('찜 화면')),
+            ),
+            GoRoute(
+              path: '/history',
+              builder: (_, _) => const Scaffold(body: Text('내 정보 화면')),
+            ),
+          ],
         ),
       ],
     );

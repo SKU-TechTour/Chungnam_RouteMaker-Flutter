@@ -1,11 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutterprojects/features/splash/views/splash_screen.dart';
 import 'package:flutterprojects/features/onboarding/views/onboarding_screen.dart';
 import 'package:flutterprojects/features/auth/views/login_screen.dart';
 import 'package:flutterprojects/features/home_curation/views/home_screen.dart';
 import 'package:flutterprojects/features/home_curation/views/main_shell.dart';
-import 'package:flutterprojects/features/home_curation/models/selected_route.dart';
 import 'package:flutterprojects/features/map_search/views/map_screen.dart';
 import 'package:flutterprojects/features/saved/views/saved_screen.dart';
 import 'package:flutterprojects/features/my_history/views/my_history_screen.dart';
@@ -39,18 +37,6 @@ final appRouter = GoRouter(
           path: '/map',
           pageBuilder: (context, state) =>
               NoTransitionPage(key: state.pageKey, child: const MapScreen()),
-        ),
-        GoRoute(
-          path: '/map/route',
-          pageBuilder: (context, state) => NoTransitionPage(
-            key: state.pageKey,
-            child: MapScreen(
-              key: ValueKey(state.extra),
-              initialRoute: state.extra is SelectedRoute
-                  ? state.extra! as SelectedRoute
-                  : null,
-            ),
-          ),
         ),
         GoRoute(
           path: '/saved',

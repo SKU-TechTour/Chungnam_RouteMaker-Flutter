@@ -519,7 +519,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     onStart: (course) {
                       final route = course.toSelectedRoute();
                       ref.read(selectedRouteProvider.notifier).state = route;
-                      context.go('/map/route', extra: route);
+                      context.go('/map');
                     },
                   ),
                   const SizedBox(height: 26),
@@ -757,7 +757,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                               liveCourse?.title ??
                                               '${_combo.name} 취향 맞춤 코스',
                                           region: _combo.code,
-                                          spots: selectedSpots,
+                                          spots: List.unmodifiable(
+                                            selectedSpots,
+                                          ),
                                           totalDistanceMeters:
                                               _previewMetrics?.distanceMeters ??
                                               liveCourse?.totalDistanceMeters ??
@@ -776,7 +778,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                 )
                                                 .state =
                                             route;
-                                        context.go('/map/route', extra: route);
+                                        context.go('/map');
                                       }
                                     : _loadRegion,
                                 icon: const Icon(Icons.navigation_rounded),
