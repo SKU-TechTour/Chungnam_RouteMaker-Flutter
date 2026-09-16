@@ -11,6 +11,9 @@ class SavedCourse {
     required this.totalDistanceMeters,
     required this.totalDurationSeconds,
     this.bookmarkCount = 0,
+    this.regionVisitorCount = 0,
+    this.popularityScore = 0,
+    this.rankingBasis = '',
   });
 
   final String id;
@@ -21,6 +24,9 @@ class SavedCourse {
   final int totalDistanceMeters;
   final int totalDurationSeconds;
   final int bookmarkCount;
+  final double regionVisitorCount;
+  final double popularityScore;
+  final String rankingBasis;
 
   String get routeKey =>
       '$regionCode:${spots.map((spot) => spot.id).join('-')}';
@@ -36,6 +42,9 @@ class SavedCourse {
     totalDistanceMeters: json['totalDistanceMeters'] as int? ?? 0,
     totalDurationSeconds: json['totalDurationSeconds'] as int? ?? 0,
     bookmarkCount: json['bookmarkCount'] as int? ?? 0,
+    regionVisitorCount: (json['regionVisitorCount'] as num?)?.toDouble() ?? 0,
+    popularityScore: (json['popularityScore'] as num?)?.toDouble() ?? 0,
+    rankingBasis: json['rankingBasis'] as String? ?? '',
   );
 
   factory SavedCourse.fromPopularApi(Map<String, dynamic> json) => SavedCourse(
@@ -50,6 +59,9 @@ class SavedCourse {
     totalDistanceMeters: (json['totalDistanceMeters'] as num?)?.round() ?? 0,
     totalDurationSeconds: (json['totalDurationSeconds'] as num?)?.round() ?? 0,
     bookmarkCount: (json['bookmarkCount'] as num?)?.round() ?? 0,
+    regionVisitorCount: (json['regionVisitorCount'] as num?)?.toDouble() ?? 0,
+    popularityScore: (json['popularityScore'] as num?)?.toDouble() ?? 0,
+    rankingBasis: json['rankingBasis'] as String? ?? '',
   );
 
   Map<String, dynamic> toJson() => {
@@ -75,6 +87,9 @@ class SavedCourse {
     'totalDistanceMeters': totalDistanceMeters,
     'totalDurationSeconds': totalDurationSeconds,
     'bookmarkCount': bookmarkCount,
+    'regionVisitorCount': regionVisitorCount,
+    'popularityScore': popularityScore,
+    'rankingBasis': rankingBasis,
   };
 
   Map<String, dynamic> toBookmarkRequest() => {

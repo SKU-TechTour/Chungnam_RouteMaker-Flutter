@@ -369,6 +369,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
               ),
             ],
+            if (int.tryParse(place.id) case final contentId?
+                when contentId > 0) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () => _showAccessibility(context, place),
+                icon: const Icon(Icons.accessible_forward_rounded),
+                label: const Text('이동 편의 정보'),
+              ),
+            ],
             const SizedBox(height: 18),
             ExternalMapButtons(
               name: place.name,
@@ -377,6 +386,88 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showAccessibility(BuildContext context, Place place) {
+    final information = ref
+        .read(placeRepositoryProvider)
+        .fetchAccessibility(place.id);
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.accessible_forward_rounded, color: AppTheme.primary),
+            SizedBox(width: 8),
+            Text('이동 편의 정보'),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: FutureBuilder<Map<String, dynamic>?>(
+            future: information,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LinearProgressIndicator(),
+                    SizedBox(height: 12),
+                    Text('무장애 여행 정보를 확인하고 있어요.'),
+                  ],
+                );
+              }
+              final data = snapshot.data;
+              final features = (data?['features'] as List<dynamic>? ?? const [])
+                  .whereType<Map<String, dynamic>>()
+                  .toList(growable: false);
+              if (snapshot.hasError || features.isEmpty) {
+                return Text(
+                  data?['message'] as String? ?? '제공되는 이동 편의 정보가 없습니다.',
+                  style: const TextStyle(color: AppTheme.textSecondary),
+                );
+              }
+              return ListView.separated(
+                shrinkWrap: true,
+                itemCount: features.length,
+                separatorBuilder: (_, _) => const Divider(height: 18),
+                itemBuilder: (context, index) {
+                  final feature = features[index];
+                  final provided = feature['provided'] as bool? ?? false;
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        provided
+                            ? Icons.check_circle_rounded
+                            : Icons.info_outline_rounded,
+                        size: 18,
+                        color: provided
+                            ? AppTheme.accent
+                            : AppTheme.textSecondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${feature['label']}\n${feature['value']}',
+                          style: const TextStyle(fontSize: 12, height: 1.4),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('확인'),
+          ),
+        ],
       ),
     );
   }
@@ -694,6 +785,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                             ref
                                 .read(mapSearchViewModelProvider.notifier)
                                 .togglePetFriendly(!state.petFriendly);
+                            _search();
+                          },
+                        ),
+                        _FilterChip(
+                          label: '이동 편의',
+                          icon: Icons.accessible_forward_rounded,
+                          selected: state.movementConvenience,
+                          onTap: () {
+                            ref
+                                .read(mapSearchViewModelProvider.notifier)
+                                .toggleMovementConvenience(
+                                  !state.movementConvenience,
+                                );
                             _search();
                           },
                         ),

@@ -12,6 +12,7 @@ class PlaceRepository {
   PlaceRepository(this._dio);
 
   final Dio _dio;
+  final Map<String, Future<Map<String, dynamic>?>> _accessibilityCache = {};
 
   Future<List<Place>> loadMockPlaces(PlaceFilterRequest request) async {
     final raw = await rootBundle.loadString('assets/mock/places.json');
@@ -46,5 +47,31 @@ class PlaceRepository {
       if (error is ApiException) throw error;
       throw ApiException(message: e.message ?? 'Failed to filter places');
     }
+  }
+
+  Future<Map<String, dynamic>?> fetchAccessibility(String contentId) async {
+    final cached = _accessibilityCache[contentId];
+    if (cached != null) return cached;
+    final request = _fetchAccessibility(contentId);
+    _accessibilityCache[contentId] = request;
+    try {
+      return await request;
+    } catch (_) {
+      if (identical(_accessibilityCache[contentId], request)) {
+        _accessibilityCache.remove(contentId);
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _fetchAccessibility(String contentId) async {
+    final response = await retryTransientDio(
+      () => _dio.get<Map<String, dynamic>>(
+        '/api/external/tour/accessibility',
+        queryParameters: {'contentId': contentId},
+        options: Options(extra: {'skipFirebaseAuth': true}),
+      ),
+    );
+    return response.data?['data'] as Map<String, dynamic>?;
   }
 }

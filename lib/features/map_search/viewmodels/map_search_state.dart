@@ -7,6 +7,7 @@ class MapSearchState {
     this.petFriendly = false,
     this.strollerAccessible = false,
     this.parking = false,
+    this.movementConvenience = false,
     this.region = 'GONGJU',
     this.isLoading = false,
     this.errorMessage,
@@ -18,6 +19,7 @@ class MapSearchState {
   final bool petFriendly;
   final bool strollerAccessible;
   final bool parking;
+  final bool movementConvenience;
   final String region;
   final bool isLoading;
   final String? errorMessage;
@@ -29,6 +31,7 @@ class MapSearchState {
     bool? petFriendly,
     bool? strollerAccessible,
     bool? parking,
+    bool? movementConvenience,
     String? region,
     bool? isLoading,
     String? errorMessage,
@@ -41,6 +44,7 @@ class MapSearchState {
       petFriendly: petFriendly ?? this.petFriendly,
       strollerAccessible: strollerAccessible ?? this.strollerAccessible,
       parking: parking ?? this.parking,
+      movementConvenience: movementConvenience ?? this.movementConvenience,
       region: region ?? this.region,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),

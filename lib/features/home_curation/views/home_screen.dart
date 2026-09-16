@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:just_audio/just_audio.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/di/providers.dart';
@@ -317,7 +318,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     });
     _persistSession();
-    ref.read(courseRepositoryProvider).prefetchSpotDetails(selected.spots);
+    final repository = ref.read(courseRepositoryProvider);
+    repository.prefetchSpotDetails(selected.spots);
+    repository.prefetchSpotCongestion(_combo.code, selected.spots);
   }
 
   Future<void> _refreshRoute() async {
@@ -352,6 +355,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _replaceSpot(int index, CourseSpot replacement) {
     setState(() => _editableSpots[index] = replacement);
+    if (replacement.source == 'TOUR_API_REALTIME') {
+      unawaited(
+        ref
+            .read(courseRepositoryProvider)
+            .fetchSpotCongestion(
+              region: _combo.code,
+              attractionName: replacement.name,
+            )
+            .catchError((_) => null),
+      );
+    }
     _persistSession();
     _refreshRoute();
   }
@@ -402,6 +416,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final details = spot != null && spot.source == 'TOUR_API_REALTIME'
         ? ref.read(courseRepositoryProvider).fetchSpotDetails(spot.id)
         : Future<Map<String, dynamic>?>.value(null);
+    final audioGuide = spot != null && spot.source == 'TOUR_API_REALTIME'
+        ? ref.read(courseRepositoryProvider).fetchAudioGuide(spot.name)
+        : Future<Map<String, dynamic>?>.value(null);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -412,6 +429,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         category: category,
         spot: spot,
         details: details,
+        audioGuide: audioGuide,
       ),
     );
   }
@@ -442,7 +460,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       curationState.courses.expand((course) => course.spots),
     );
     final saved = ref.watch(savedCoursesProvider);
-    final popularCourses = ref.watch(popularCoursesProvider);
     final selectedSpots = _editableSpots;
     final selectedCourse = _selectedCourse(liveCourse, selectedSpots);
     final isSaved = saved.any((course) => course.hasSameRoute(selectedCourse));
@@ -456,9 +473,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               sliver: SliverList.list(
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       const RouteMakerLogo(compact: true),
-                      const Spacer(),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          '오늘은 충남 어디로\n떠나볼까요?',
+                          style: TextStyle(
+                            fontFamily: AppTheme.gowunDodum,
+                            color: AppTheme.textPrimary,
+                            fontSize: 16,
+                            height: 1.2,
+                            fontWeight: FontWeight.w400,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ),
                       IconButton(
                         tooltip: '알림',
                         onPressed: () =>
@@ -474,19 +505,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 28),
-                  const Text(
-                    '오늘은 충남 어디로\n떠나볼까요?',
-                    style: TextStyle(
-                      fontFamily: AppTheme.gowunDodum,
-                      color: AppTheme.textPrimary,
-                      fontSize: 16,
-                      height: 1.2,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   _HourlyWeatherCard(
                     region: _combo.name,
                     course: liveCourse,
@@ -509,21 +528,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       onEdit: _editPreferences,
                     ),
                   ],
-                  const SizedBox(height: 16),
-                  _PreferenceSummary(
-                    concepts: _concepts,
-                    onEdit: _editPreferences,
-                  ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 18),
                   _PopularCoursesSection(
-                    courses: popularCourses,
                     onStart: (course) {
                       final route = course.toSelectedRoute();
                       ref.read(selectedRouteProvider.notifier).state = route;
                       context.go('/map');
                     },
                   ),
-                  const SizedBox(height: 26),
+                  const SizedBox(height: 20),
                   if (curationState.errorMessage != null) ...[
                     _ApiErrorBanner(
                       message: curationState.errorMessage!,
@@ -564,25 +577,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       else
-                        Container(
-                          constraints: const BoxConstraints(maxWidth: 150),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.softMint,
+                        Tooltip(
+                          message: '취향 변경',
+                          child: InkWell(
+                            onTap: _editPreferences,
                             borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            '${_concepts.map((concept) => concept.label).join(' · ')} 반영',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: AppTheme.primary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
+                            child: Container(
+                              constraints: const BoxConstraints(maxWidth: 150),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.softMint,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                _concepts
+                                    .map((concept) => concept.label)
+                                    .join(' · '),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: AppTheme.primary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -636,6 +658,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           category: _categoryLabel(spot.category),
                           spot: spot,
                         ),
+                        congestion: spot.source == 'TOUR_API_REALTIME'
+                            ? ref
+                                  .read(courseRepositoryProvider)
+                                  .fetchSpotCongestion(
+                                    region: _combo.code,
+                                    attractionName: spot.name,
+                                  )
+                            : Future<Map<String, dynamic>?>.value(null),
                         onDelete: spot.id == '-1' || _editableSpots.length <= 2
                             ? null
                             : () => _removeSpot(index),
@@ -807,158 +837,224 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-class _PopularCoursesSection extends ConsumerWidget {
-  const _PopularCoursesSection({required this.courses, required this.onStart});
+class _PopularCoursesSection extends ConsumerStatefulWidget {
+  const _PopularCoursesSection({required this.onStart});
 
-  final AsyncValue<List<SavedCourse>> courses;
   final ValueChanged<SavedCourse> onStart;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Row(
-        children: [
-          Icon(Icons.local_fire_department_rounded, color: AppTheme.coral),
-          SizedBox(width: 8),
-          Text(
-            '가장 인기 있는 코스 TOP 3',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+  ConsumerState<_PopularCoursesSection> createState() =>
+      _PopularCoursesSectionState();
+}
+
+class _PopularCoursesSectionState
+    extends ConsumerState<_PopularCoursesSection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final courses = _expanded
+        ? ref.watch(popularCoursesProvider)
+        : const AsyncValue<List<SavedCourse>>.loading();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          child: InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.local_fire_department_rounded,
+                    color: AppTheme.coral,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      '가장 인기 있는 코스 TOP 3',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _expanded ? '접기' : '펼치기',
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
-      const SizedBox(height: 5),
-      const Text(
-        '여행자들이 실제로 찜한 횟수를 기준으로 보여드려요.',
-        style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-      ),
-      const SizedBox(height: 12),
-      courses.when(
-        loading: () => const SizedBox(
-          height: 76,
-          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
         ),
-        error: (_, _) => const _PopularCourseEmpty(
-          message: '인기 코스를 불러오지 못했어요. 잠시 후 다시 확인해주세요.',
-        ),
-        data: (items) => items.isEmpty
-            ? const _PopularCourseEmpty(message: '첫 번째 인기 코스를 기다리고 있어요.')
-            : Column(
-                children: items
-                    .take(3)
-                    .toList(growable: false)
-                    .asMap()
-                    .entries
-                    .map((entry) {
-                      final course = entry.value;
-                      final isSaved = ref
-                          .watch(savedCoursesProvider)
-                          .any((saved) => saved.routeKey == course.routeKey);
-                      final routeLabel = course.spots
-                          .take(3)
-                          .map((spot) => spot.name)
-                          .join(' → ');
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 9),
-                        child: Material(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(18),
-                            onTap: course.spots.length >= 2
-                                ? () => onStart(course)
-                                : null,
-                            child: Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    alignment: Alignment.center,
-                                    decoration: const BoxDecoration(
-                                      color: AppTheme.softCoral,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Text(
-                                      '${entry.key + 1}',
-                                      style: const TextStyle(
-                                        color: AppTheme.coral,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          routeLabel,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+        if (_expanded) ...[
+          const SizedBox(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              '지역 방문자수 50% · 코스 찜 50%를 합산한 순위예요.',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+            ),
+          ),
+          const SizedBox(height: 10),
+          courses.when(
+            loading: () => const SizedBox(
+              height: 76,
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+            error: (_, _) => const _PopularCourseEmpty(
+              message: '인기 코스를 불러오지 못했어요. 잠시 후 다시 확인해주세요.',
+            ),
+            data: (items) => items.isEmpty
+                ? const _PopularCourseEmpty(message: '첫 번째 인기 코스를 기다리고 있어요.')
+                : Column(
+                    children: items
+                        .take(3)
+                        .toList(growable: false)
+                        .asMap()
+                        .entries
+                        .map((entry) {
+                          final course = entry.value;
+                          final isSaved = ref
+                              .watch(savedCoursesProvider)
+                              .any(
+                                (saved) => saved.routeKey == course.routeKey,
+                              );
+                          final routeLabel = course.spots
+                              .take(3)
+                              .map((spot) => spot.name)
+                              .join(' → ');
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 9),
+                            child: Material(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(18),
+                                onTap: course.spots.length >= 2
+                                    ? () => widget.onStart(course)
+                                    : null,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 36,
+                                        height: 36,
+                                        alignment: Alignment.center,
+                                        decoration: const BoxDecoration(
+                                          color: AppTheme.softCoral,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Text(
+                                          '${entry.key + 1}',
                                           style: const TextStyle(
+                                            color: AppTheme.coral,
                                             fontWeight: FontWeight.w900,
                                           ),
                                         ),
-                                        Text(
-                                          '${course.title} · ${course.spots.length}개 경유지',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            color: AppTheme.textSecondary,
-                                            fontSize: 11,
-                                          ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              routeLabel,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                            ),
+                                            Text(
+                                              '${course.title} · ${course.spots.length}개 경유지',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: AppTheme.textSecondary,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                            Text(
+                                              '종합 ${course.popularityScore.toStringAsFixed(1)}점',
+                                              style: const TextStyle(
+                                                color: AppTheme.accent,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                  IconButton(
-                                    tooltip: isSaved ? '찜 해제' : '이 코스 찜하기',
-                                    onPressed: () {
-                                      ref
-                                          .read(savedCoursesProvider.notifier)
-                                          .toggle(course);
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            isSaved
-                                                ? '인기 코스 찜을 해제했어요.'
-                                                : '인기 코스를 찜했어요.',
-                                          ),
+                                      ),
+                                      IconButton(
+                                        tooltip: isSaved ? '찜 해제' : '이 코스 찜하기',
+                                        onPressed: () {
+                                          ref
+                                              .read(
+                                                savedCoursesProvider.notifier,
+                                              )
+                                              .toggle(course);
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                isSaved
+                                                    ? '인기 코스 찜을 해제했어요.'
+                                                    : '인기 코스를 찜했어요.',
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        icon: Icon(
+                                          isSaved
+                                              ? Icons.bookmark_rounded
+                                              : Icons.bookmark_border_rounded,
+                                          color: AppTheme.primary,
+                                          size: 20,
                                         ),
-                                      );
-                                    },
-                                    icon: Icon(
-                                      isSaved
-                                          ? Icons.bookmark_rounded
-                                          : Icons.bookmark_border_rounded,
-                                      color: AppTheme.primary,
-                                      size: 20,
-                                    ),
+                                      ),
+                                      Text(
+                                        '${course.bookmarkCount}',
+                                        style: const TextStyle(
+                                          color: AppTheme.primary,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  Text(
-                                    '${course.bookmarkCount}',
-                                    style: const TextStyle(
-                                      color: AppTheme.primary,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                      );
-                    })
-                    .toList(growable: false),
-              ),
-      ),
-    ],
-  );
+                          );
+                        })
+                        .toList(growable: false),
+                  ),
+          ),
+        ],
+      ],
+    );
+  }
 }
 
 class _PopularCourseEmpty extends StatelessWidget {
@@ -1175,6 +1271,7 @@ class _ComboStep extends StatelessWidget {
     required this.selectedIndex,
     required this.onChanged,
     required this.onInfo,
+    required this.congestion,
     this.onDelete,
   });
   final int number;
@@ -1185,6 +1282,7 @@ class _ComboStep extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onChanged;
   final VoidCallback onInfo;
+  final Future<Map<String, dynamic>?> congestion;
   final VoidCallback? onDelete;
 
   @override
@@ -1270,6 +1368,46 @@ class _ComboStep extends StatelessWidget {
                     ],
                   ),
                 ),
+              ),
+              FutureBuilder<Map<String, dynamic>?>(
+                future: congestion,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.only(top: 5),
+                      child: SizedBox(
+                        width: 70,
+                        child: LinearProgressIndicator(minHeight: 2),
+                      ),
+                    );
+                  }
+                  final data = snapshot.data;
+                  if (data?['available'] != true) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 5),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.people_alt_outlined,
+                          size: 14,
+                          color: AppTheme.accent,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '예상 혼잡도 · ${data?['level']}',
+                          style: const TextStyle(
+                            color: AppTheme.accent,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -1410,12 +1548,14 @@ class _SpotDetailSheet extends StatelessWidget {
     required this.category,
     required this.spot,
     required this.details,
+    required this.audioGuide,
   });
 
   final String name;
   final String category;
   final CourseSpot? spot;
   final Future<Map<String, dynamic>?> details;
+  final Future<Map<String, dynamic>?> audioGuide;
 
   String _plainText(String value) => value
       .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
@@ -1593,6 +1733,8 @@ class _SpotDetailSheet extends StatelessWidget {
               );
             },
           ),
+          const SizedBox(height: 18),
+          _AudioGuideCard(audioGuide: audioGuide),
           if (spot != null) ...[
             const SizedBox(height: 18),
             ExternalMapButtons(
@@ -1624,6 +1766,176 @@ class _SpotDetailSheet extends StatelessWidget {
           ),
         ],
       ),
+    ),
+  );
+}
+
+class _AudioGuideCard extends StatefulWidget {
+  const _AudioGuideCard({required this.audioGuide});
+
+  final Future<Map<String, dynamic>?> audioGuide;
+
+  @override
+  State<_AudioGuideCard> createState() => _AudioGuideCardState();
+}
+
+class _AudioGuideCardState extends State<_AudioGuideCard> {
+  final AudioPlayer _player = AudioPlayer();
+  String? _loadedUrl;
+  bool _preparing = false;
+  bool _showScript = false;
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle(String url) async {
+    if (_player.playing) {
+      await _player.pause();
+      return;
+    }
+    try {
+      if (_loadedUrl != url) {
+        setState(() => _preparing = true);
+        await _player.setUrl(url);
+        _loadedUrl = url;
+      }
+      await _player.play();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('오디오 해설을 재생하지 못했어요.')));
+      }
+    } finally {
+      if (mounted) setState(() => _preparing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>?>(
+    future: widget.audioGuide,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const _EnrichmentLoadingCard(
+          icon: Icons.headphones_rounded,
+          message: '관광지 오디오 해설을 확인하고 있어요.',
+        );
+      }
+      final data = snapshot.data;
+      final url = data?['audioUrl'] as String? ?? '';
+      if (snapshot.hasError || data?['available'] != true || url.isEmpty) {
+        return const SizedBox.shrink();
+      }
+      final title = data?['title'] as String? ?? '관광지 오디오 해설';
+      final script = data?['script'] as String? ?? '';
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.softMint,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.headphones_rounded, color: AppTheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                StreamBuilder<PlayerState>(
+                  stream: _player.playerStateStream,
+                  builder: (context, playerSnapshot) {
+                    final playing = playerSnapshot.data?.playing ?? false;
+                    return IconButton.filled(
+                      tooltip: playing ? '일시정지' : '오디오 해설 재생',
+                      onPressed: _preparing ? null : () => _toggle(url),
+                      icon: _preparing
+                          ? const SizedBox(
+                              width: 17,
+                              height: 17,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Icon(
+                              playing
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                            ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            if (script.isNotEmpty) ...[
+              TextButton.icon(
+                onPressed: () => setState(() => _showScript = !_showScript),
+                icon: Icon(
+                  _showScript
+                      ? Icons.expand_less_rounded
+                      : Icons.subject_rounded,
+                  size: 17,
+                ),
+                label: Text(_showScript ? '해설 원고 접기' : '해설 원고 보기'),
+              ),
+              if (_showScript)
+                Text(
+                  script,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                    height: 1.55,
+                  ),
+                ),
+            ],
+            const Text(
+              '한국관광공사 오디 오디오 가이드',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 9),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class _EnrichmentLoadingCard extends StatelessWidget {
+  const _EnrichmentLoadingCard({required this.icon, required this.message});
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: AppTheme.softMint,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, color: AppTheme.primary),
+        const SizedBox(width: 10),
+        Expanded(child: Text(message, style: const TextStyle(fontSize: 12))),
+        const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ],
     ),
   );
 }
@@ -1938,51 +2250,6 @@ class _NonsanEntryCard extends StatelessWidget {
         ),
       ],
     ),
-  );
-}
-
-class _PreferenceSummary extends StatelessWidget {
-  const _PreferenceSummary({required this.concepts, required this.onEdit});
-
-  final Set<TravelConcept> concepts;
-  final VoidCallback onEdit;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Expanded(
-        child: Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: concepts
-              .map(
-                (concept) => Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.softMint,
-                    borderRadius: BorderRadius.circular(9),
-                    border: Border.all(
-                      color: AppTheme.primary.withValues(alpha: 0.12),
-                    ),
-                  ),
-                  child: Text(
-                    concept.label,
-                    style: const TextStyle(
-                      color: AppTheme.primary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-        ),
-      ),
-      TextButton(onPressed: onEdit, child: const Text('취향 변경')),
-    ],
   );
 }
 

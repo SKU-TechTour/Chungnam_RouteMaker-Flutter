@@ -16,6 +16,8 @@ class MapSearchViewModel extends Notifier<MapSearchState> {
   void toggleStrollerAccessible(bool value) =>
       state = state.copyWith(strollerAccessible: value);
   void toggleParking(bool value) => state = state.copyWith(parking: value);
+  void toggleMovementConvenience(bool value) =>
+      state = state.copyWith(movementConvenience: value);
 
   Future<void> searchNearby() async {
     state = state.copyWith(isLoading: true, clearError: true);
@@ -24,6 +26,7 @@ class MapSearchViewModel extends Notifier<MapSearchState> {
       petFriendly: state.petFriendly,
       strollerAccessible: state.strollerAccessible,
       largeParking: state.parking,
+      movementConvenience: state.movementConvenience,
     );
     List<Place> places;
     final repository = ref.read(placeRepositoryProvider);

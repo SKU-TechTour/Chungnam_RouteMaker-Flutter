@@ -16,6 +16,8 @@ class CourseRepository {
 
   final Dio _dio;
   final Map<String, Future<Map<String, dynamic>?>> _spotDetailCache = {};
+  final Map<String, Future<Map<String, dynamic>?>> _congestionCache = {};
+  final Map<String, Future<Map<String, dynamic>?>> _audioGuideCache = {};
 
   Future<bool> isServerHealthy() async {
     try {
@@ -179,6 +181,77 @@ class CourseRepository {
       (spot) => spot.source == 'TOUR_API_REALTIME',
     )) {
       unawaited(fetchSpotDetails(spot.id).catchError((_) => null));
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchSpotCongestion({
+    required String region,
+    required String attractionName,
+  }) => _cachedEnrichment(
+    _congestionCache,
+    '$region:$attractionName',
+    '/api/external/tour/congestion',
+    {'region': region, 'attractionName': attractionName},
+  );
+
+  Future<Map<String, dynamic>?> fetchAudioGuide(String attractionName) =>
+      _cachedEnrichment(
+        _audioGuideCache,
+        attractionName,
+        '/api/external/tour/audio-guide',
+        {'attractionName': attractionName},
+      );
+
+  void prefetchSpotCongestion(String region, Iterable<CourseSpot> spots) {
+    for (final spot in spots.where(
+      (spot) => spot.source == 'TOUR_API_REALTIME',
+    )) {
+      unawaited(
+        fetchSpotCongestion(
+          region: region,
+          attractionName: spot.name,
+        ).catchError((_) => null),
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>?> _cachedEnrichment(
+    Map<String, Future<Map<String, dynamic>?>> cache,
+    String key,
+    String path,
+    Map<String, dynamic> query,
+  ) async {
+    final cached = cache[key];
+    if (cached != null) return cached;
+    final request = _fetchEnrichment(path, query);
+    cache[key] = request;
+    try {
+      return await request;
+    } catch (_) {
+      if (identical(cache[key], request)) cache.remove(key);
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _fetchEnrichment(
+    String path,
+    Map<String, dynamic> query,
+  ) async {
+    try {
+      final response = await retryTransientDio(
+        () => _dio.get<Map<String, dynamic>>(
+          path,
+          queryParameters: query,
+          options: Options(extra: {'skipFirebaseAuth': true}),
+        ),
+      );
+      return response.data?['data'] as Map<String, dynamic>?;
+    } on DioException catch (error) {
+      final apiError = error.error;
+      if (apiError is ApiException) throw apiError;
+      throw ApiException(
+        message: error.message ?? 'Failed to fetch TourAPI enrichment',
+      );
     }
   }
 

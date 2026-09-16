@@ -101,17 +101,20 @@ class PlaceFilterRequest {
     this.petFriendly = false,
     this.strollerAccessible = false,
     this.largeParking = false,
+    this.movementConvenience = false,
   });
 
   final String region;
   final bool petFriendly;
   final bool strollerAccessible;
   final bool largeParking;
+  final bool movementConvenience;
 
   Map<String, dynamic> toQueryParameters() => {
     'region': region,
     'petFriendly': petFriendly,
     'strollerAccessible': strollerAccessible,
     'largeParking': largeParking,
+    'movementConvenience': movementConvenience,
   };
 }
