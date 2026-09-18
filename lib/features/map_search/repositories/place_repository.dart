@@ -13,6 +13,7 @@ class PlaceRepository {
 
   final Dio _dio;
   final Map<String, Future<Map<String, dynamic>?>> _accessibilityCache = {};
+  final Map<String, Future<Map<String, dynamic>?>> _petInfoCache = {};
 
   Future<List<Place>> loadMockPlaces(PlaceFilterRequest request) async {
     final raw = await rootBundle.loadString('assets/mock/places.json');
@@ -68,6 +69,32 @@ class PlaceRepository {
     final response = await retryTransientDio(
       () => _dio.get<Map<String, dynamic>>(
         '/api/external/tour/accessibility',
+        queryParameters: {'contentId': contentId},
+        options: Options(extra: {'skipFirebaseAuth': true}),
+      ),
+    );
+    return response.data?['data'] as Map<String, dynamic>?;
+  }
+
+  Future<Map<String, dynamic>?> fetchPetInfo(String contentId) async {
+    final cached = _petInfoCache[contentId];
+    if (cached != null) return cached;
+    final request = _fetchPetInfo(contentId);
+    _petInfoCache[contentId] = request;
+    try {
+      return await request;
+    } catch (_) {
+      if (identical(_petInfoCache[contentId], request)) {
+        _petInfoCache.remove(contentId);
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _fetchPetInfo(String contentId) async {
+    final response = await retryTransientDio(
+      () => _dio.get<Map<String, dynamic>>(
+        '/api/external/tour/pet-info',
         queryParameters: {'contentId': contentId},
         options: Options(extra: {'skipFirebaseAuth': true}),
       ),

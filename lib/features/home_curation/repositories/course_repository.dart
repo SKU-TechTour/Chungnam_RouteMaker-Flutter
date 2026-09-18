@@ -60,22 +60,10 @@ class CourseRepository {
       'variant': variant,
     };
     try {
-      var courses = await _fetchCoursesOnce(requestData);
-      // 간헐적으로 코스 응답은 성공하지만 기상청 배열만 비어 오는 경우가 있다.
-      // 빈 예보를 '비가 오지 않음'으로 오인하지 않고 한 번만 다시 요청한다.
-      if (courses.isNotEmpty &&
-          courses.every((course) => course.hourlyWeather.isEmpty)) {
-        await Future<void>.delayed(const Duration(milliseconds: 250));
-        try {
-          final retried = await _fetchCoursesOnce(requestData);
-          if (retried.any((course) => course.hourlyWeather.isNotEmpty)) {
-            courses = retried;
-          }
-        } catch (_) {
-          // 관광 코스 자체는 유효하므로 날씨 재시도 실패가 전체 화면을 막지 않는다.
-        }
-      }
-      return courses;
+      // 빈 날씨 때문에 관광·경로 API 전체를 한 번 더 호출하면 첫 화면이
+      // 두 배 가까이 늦어진다. 코스 응답은 즉시 표시하고 날씨 없음은 카드에서
+      // 별도로 안내한다.
+      return await _fetchCoursesOnce(requestData);
     } on DioException catch (e) {
       final error = e.error;
       if (error is ApiException) throw error;
@@ -91,7 +79,10 @@ class CourseRepository {
         () => _dio.post<Map<String, dynamic>>(
           '/api/courses/recommendations',
           data: requestData,
-          options: Options(extra: {'skipFirebaseAuth': true}),
+          options: Options(
+            extra: {'skipFirebaseAuth': true},
+            receiveTimeout: const Duration(seconds: 25),
+          ),
         ),
       );
       final data = response.data?['data'] as List<dynamic>?;

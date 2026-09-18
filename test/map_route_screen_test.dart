@@ -18,6 +18,37 @@ import 'package:flutterprojects/features/map_search/repositories/place_repositor
 import 'package:go_router/go_router.dart';
 
 void main() {
+  testWidgets('현 위치 요청 전에 선택 권한 사전 안내를 표시한다', (tester) async {
+    final location = _PermissionLocationUtil();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          placeRepositoryProvider.overrideWithValue(_FakePlaceRepository()),
+          locationUtilProvider.overrideWithValue(location),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: MapScreen(tileProvider: _MemoryTiles()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byTooltip('현 위치로 이동'));
+    await tester.pump();
+
+    expect(find.text('위치 접근 권한 안내'), findsOneWidget);
+    expect(find.text('선택 권한'), findsOneWidget);
+    expect(find.text('동의하고 계속'), findsOneWidget);
+    expect(location.requestCount, 0);
+
+    await tester.tap(find.text('나중에'));
+    await tester.pump();
+    expect(location.requestCount, 0);
+    expect(find.byType(fm.FlutterMap), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('일반 주변 코스는 장소 핀만 표시하고 임의의 연결선을 만들지 않는다', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -340,6 +371,24 @@ class _FakeLocationUtil extends LocationUtil {
   const _FakeLocationUtil();
 
   @override
+  Future<AppLocationPermission> permissionStatus() async =>
+      AppLocationPermission.granted;
+
+  @override
   Future<({double lat, double lng})> getCurrentPosition() async =>
       (lat: 36.15, lng: 127.12);
+}
+
+class _PermissionLocationUtil extends LocationUtil {
+  int requestCount = 0;
+
+  @override
+  Future<AppLocationPermission> permissionStatus() async =>
+      AppLocationPermission.denied;
+
+  @override
+  Future<AppLocationPermission> requestPermission() async {
+    requestCount++;
+    return AppLocationPermission.denied;
+  }
 }

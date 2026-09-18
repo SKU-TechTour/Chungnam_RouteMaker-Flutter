@@ -168,18 +168,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         message: 'TourAPI로부터 여행 정보를 불러오는 중입니다.',
       ),
     );
-    final progressTimer = Timer.periodic(const Duration(milliseconds: 280), (
+    final progressTimer = Timer.periodic(const Duration(milliseconds: 180), (
       _,
     ) {
       final current = progress.value;
-      if (current.failed || current.value >= 0.94) return;
-      final next = (current.value + 0.018).clamp(0.0, 0.94);
+      if (current.failed || current.value >= 0.99) return;
+      final step = switch (current.value) {
+        < 0.72 => 0.025,
+        < 0.9 => 0.012,
+        _ => 0.003,
+      };
+      final next = (current.value + step).clamp(0.0, 0.99);
       progress.value = _InitialLoadProgress(
         value: next,
         message: switch (next) {
           < 0.4 => 'TourAPI로부터 여행 정보를 불러오는 중입니다.',
           < 0.7 => '날씨와 이동 정보를 함께 확인하는 중입니다.',
-          _ => '취향에 맞는 여행 코스를 정리하는 중입니다.',
+          < 0.94 => '취향에 맞는 여행 코스를 정리하는 중입니다.',
+          _ => '공공데이터 서버의 마지막 응답을 확인하고 있습니다.',
         },
       );
     });
@@ -850,6 +856,63 @@ class _PopularCoursesSection extends ConsumerStatefulWidget {
 class _PopularCoursesSectionState
     extends ConsumerState<_PopularCoursesSection> {
   bool _expanded = false;
+  String _selectedRegion = 'NONSAN';
+  Timer? _popularProgressTimer;
+  int _popularProgress = 0;
+  bool _popularFinishing = false;
+  bool _popularReady = false;
+
+  @override
+  void dispose() {
+    _popularProgressTimer?.cancel();
+    super.dispose();
+  }
+
+  void _toggleExpanded() {
+    final next = !_expanded;
+    setState(() => _expanded = next);
+    if (!next) {
+      _popularProgressTimer?.cancel();
+      return;
+    }
+    final cached = ref.read(popularCoursesProvider);
+    if (cached.hasValue) {
+      setState(() {
+        _popularProgress = 100;
+        _popularReady = true;
+      });
+      return;
+    }
+    _popularProgressTimer?.cancel();
+    _popularProgress = 0;
+    _popularReady = false;
+    _popularFinishing = false;
+    _popularProgressTimer = Timer.periodic(const Duration(milliseconds: 90), (
+      _,
+    ) {
+      if (!mounted || _popularProgress >= 96) {
+        _popularProgressTimer?.cancel();
+        return;
+      }
+      setState(() => _popularProgress = (_popularProgress + 4).clamp(0, 96));
+    });
+  }
+
+  void _finishPopularLoading() {
+    if (_popularReady || _popularFinishing) return;
+    _popularFinishing = true;
+    _popularProgressTimer?.cancel();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      setState(() => _popularProgress = 100);
+      await Future<void>.delayed(const Duration(milliseconds: 260));
+      if (!mounted) return;
+      setState(() {
+        _popularReady = true;
+        _popularFinishing = false;
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -863,7 +926,7 @@ class _PopularCoursesSectionState
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
           child: InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
+            onTap: _toggleExpanded,
             borderRadius: BorderRadius.circular(18),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
@@ -915,141 +978,169 @@ class _PopularCoursesSectionState
             ),
           ),
           const SizedBox(height: 10),
+          Row(
+            children:
+                const [('NONSAN', '논산'), ('GONGJU', '공주'), ('BUYEO', '부여')]
+                    .map((region) {
+                      final selected = _selectedRegion == region.$1;
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: ChoiceChip(
+                            label: Center(child: Text(region.$2)),
+                            selected: selected,
+                            showCheckmark: false,
+                            onSelected: (_) =>
+                                setState(() => _selectedRegion = region.$1),
+                          ),
+                        ),
+                      );
+                    })
+                    .toList(growable: false),
+          ),
+          const SizedBox(height: 10),
           courses.when(
-            loading: () => const SizedBox(
-              height: 76,
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            ),
+            loading: () => _PopularCoursesLoading(percent: _popularProgress),
             error: (_, _) => const _PopularCourseEmpty(
               message: '인기 코스를 불러오지 못했어요. 잠시 후 다시 확인해주세요.',
             ),
-            data: (items) => items.isEmpty
-                ? const _PopularCourseEmpty(message: '첫 번째 인기 코스를 기다리고 있어요.')
-                : Column(
-                    children: items
-                        .take(3)
-                        .toList(growable: false)
-                        .asMap()
-                        .entries
-                        .map((entry) {
-                          final course = entry.value;
-                          final isSaved = ref
-                              .watch(savedCoursesProvider)
-                              .any(
-                                (saved) => saved.routeKey == course.routeKey,
-                              );
-                          final routeLabel = course.spots
-                              .take(3)
-                              .map((spot) => spot.name)
-                              .join(' → ');
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 9),
-                            child: Material(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(18),
-                                onTap: course.spots.length >= 2
-                                    ? () => widget.onStart(course)
-                                    : null,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(14),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 36,
-                                        height: 36,
-                                        alignment: Alignment.center,
-                                        decoration: const BoxDecoration(
-                                          color: AppTheme.softCoral,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Text(
-                                          '${entry.key + 1}',
+            data: (items) {
+              if (!_popularReady) {
+                _finishPopularLoading();
+                return _PopularCoursesLoading(percent: _popularProgress);
+              }
+              final regionalItems = items
+                  .where((course) => course.regionCode == _selectedRegion)
+                  .take(3)
+                  .toList(growable: false);
+              if (regionalItems.isEmpty) {
+                return _PopularCourseEmpty(
+                  message:
+                      '${_regionName(_selectedRegion)} 인기 코스 데이터를 준비하고 있어요.',
+                );
+              }
+              return Column(
+                children: regionalItems
+                    .take(3)
+                    .toList(growable: false)
+                    .asMap()
+                    .entries
+                    .map((entry) {
+                      final course = entry.value;
+                      final isSaved = ref
+                          .watch(savedCoursesProvider)
+                          .any((saved) => saved.routeKey == course.routeKey);
+                      final routeLabel = course.spots
+                          .take(3)
+                          .map((spot) => spot.name)
+                          .join(' → ');
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 9),
+                        child: Material(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(18),
+                            onTap: course.spots.length >= 2
+                                ? () => widget.onStart(course)
+                                : null,
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    alignment: Alignment.center,
+                                    decoration: const BoxDecoration(
+                                      color: AppTheme.softCoral,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      '${entry.key + 1}',
+                                      style: const TextStyle(
+                                        color: AppTheme.coral,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          routeLabel,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
-                                            color: AppTheme.coral,
                                             fontWeight: FontWeight.w900,
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              routeLabel,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w900,
-                                              ),
-                                            ),
-                                            Text(
-                                              '${course.title} · ${course.spots.length}개 경유지',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: AppTheme.textSecondary,
-                                                fontSize: 11,
-                                              ),
-                                            ),
-                                            Text(
-                                              '종합 ${course.popularityScore.toStringAsFixed(1)}점',
-                                              style: const TextStyle(
-                                                color: AppTheme.accent,
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w800,
-                                              ),
-                                            ),
-                                          ],
+                                        Text(
+                                          '${course.title} · ${course.spots.length}개 경유지',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: AppTheme.textSecondary,
+                                            fontSize: 11,
+                                          ),
                                         ),
-                                      ),
-                                      IconButton(
-                                        tooltip: isSaved ? '찜 해제' : '이 코스 찜하기',
-                                        onPressed: () {
-                                          ref
-                                              .read(
-                                                savedCoursesProvider.notifier,
-                                              )
-                                              .toggle(course);
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                isSaved
-                                                    ? '인기 코스 찜을 해제했어요.'
-                                                    : '인기 코스를 찜했어요.',
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        icon: Icon(
-                                          isSaved
-                                              ? Icons.bookmark_rounded
-                                              : Icons.bookmark_border_rounded,
-                                          color: AppTheme.primary,
-                                          size: 20,
+                                        Text(
+                                          '${course.bookmarkCount}명이 찜한 코스',
+                                          style: const TextStyle(
+                                            color: AppTheme.accent,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                          ),
                                         ),
-                                      ),
-                                      Text(
-                                        '${course.bookmarkCount}',
-                                        style: const TextStyle(
-                                          color: AppTheme.primary,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
+                                  IconButton(
+                                    tooltip: isSaved ? '찜 해제' : '이 코스 찜하기',
+                                    onPressed: () {
+                                      ref
+                                          .read(savedCoursesProvider.notifier)
+                                          .toggle(course);
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            isSaved
+                                                ? '인기 코스 찜을 해제했어요.'
+                                                : '인기 코스를 찜했어요.',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: Icon(
+                                      isSaved
+                                          ? Icons.bookmark_rounded
+                                          : Icons.bookmark_border_rounded,
+                                      color: AppTheme.primary,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${course.bookmarkCount}',
+                                    style: const TextStyle(
+                                      color: AppTheme.primary,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          );
-                        })
-                        .toList(growable: false),
-                  ),
+                          ),
+                        ),
+                      );
+                    })
+                    .toList(growable: false),
+              );
+            },
           ),
         ],
       ],
@@ -1076,6 +1167,55 @@ class _PopularCourseEmpty extends StatelessWidget {
     ),
   );
 }
+
+class _PopularCoursesLoading extends StatelessWidget {
+  const _PopularCoursesLoading({required this.percent});
+
+  final int percent;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+    ),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                percent < 100 ? '인기 코스를 계산하고 있어요.' : '인기 코스 준비가 완료됐어요.',
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(
+              '$percent%',
+              style: const TextStyle(
+                color: AppTheme.primary,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 9),
+        LinearProgressIndicator(value: percent / 100),
+      ],
+    ),
+  );
+}
+
+String _regionName(String code) => switch (code) {
+  'NONSAN' => '논산',
+  'GONGJU' => '공주',
+  'BUYEO' => '부여',
+  _ => code,
+};
 
 List<CourseSpot> _uniqueSpots(Iterable<CourseSpot> spots) {
   final byId = <String, CourseSpot>{};

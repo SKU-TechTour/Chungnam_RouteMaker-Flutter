@@ -3,14 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' as fm;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/location_util.dart';
 import '../../../core/widgets/external_map_buttons.dart';
 import '../../home_curation/models/course.dart';
 import '../../home_curation/models/selected_route.dart';
+import '../../saved/models/saved_place.dart';
+import '../../saved/viewmodels/saved_places_provider.dart';
 import '../viewmodels/journey_progress_provider.dart';
 import '../models/place.dart';
 
@@ -74,7 +78,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (!mounted) return;
     _mapReady = true;
     _fitSelectedRoute();
-    _moveToCurrentLocation(searchNearby: _selectedRoute == null);
+    // 선택 코스는 GPS 권한과 무관하게 즉시 표시한다. 주변 지도도 선택된
+    // 지역 중심에서 먼저 열고, GPS는 사용자가 현 위치 버튼을 누를 때만 쓴다.
+    if (_selectedRoute == null) {
+      unawaited(_search());
+    }
   }
 
   void _fitPoints(List<ll.LatLng> points) {
@@ -261,131 +269,154 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   void _showPlace(BuildContext context, Place place) {
+    final region = ref.read(mapSearchViewModelProvider).region;
+    final savedPlace = SavedPlace.fromPlace(place, region);
+    final audioGuide = int.tryParse(place.id) != null
+        ? ref.read(courseRepositoryProvider).fetchAudioGuide(place.name)
+        : Future<Map<String, dynamic>?>.value(null);
+    final congestion = int.tryParse(place.id) != null
+        ? ref.read(courseRepositoryProvider).fetchSpotCongestion(
+            region: region,
+            attractionName: place.name,
+          )
+        : Future<Map<String, dynamic>?>.value(null);
+    final petInfo = place.petFriendly && int.tryParse(place.id) != null
+        ? ref.read(placeRepositoryProvider).fetchPetInfo(place.id)
+        : Future<Map<String, dynamic>?>.value(null);
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          12,
-          20,
-          22 + MediaQuery.paddingOf(context).bottom,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.divider,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final isSaved = ref
+              .read(savedPlacesProvider)
+              .any((item) => item.storageKey == savedPlace.storageKey);
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.78,
             ),
-            const SizedBox(height: 16),
-            if (place.imageUrl?.isNotEmpty == true)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Image.network(
-                  place.imageUrl!,
-                  width: double.infinity,
-                  height: 170,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                ),
-              ),
-            if (place.imageUrl?.isNotEmpty == true) const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    place.name,
-                    style: const TextStyle(
-                      fontFamily: AppTheme.gowunDodum,
-                      fontSize: 23,
-                    ),
-                  ),
-                ),
-                if (place.scheduledTime case final time?)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.softCoral,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      time,
-                      style: const TextStyle(
-                        color: AppTheme.coral,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 22),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppTheme.divider,
+                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                   ),
-              ],
-            ),
-            if (place.address?.isNotEmpty == true) ...[
-              const SizedBox(height: 8),
-              Text(
-                place.address!,
-                style: const TextStyle(color: AppTheme.textSecondary),
-              ),
-            ],
-            if (place.petFriendly) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.softMint,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.pets_rounded, size: 15, color: AppTheme.primary),
-                    SizedBox(width: 6),
+                  const SizedBox(height: 14),
+                  if (place.imageUrl?.isNotEmpty == true) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.network(
+                        place.imageUrl!,
+                        width: double.infinity,
+                        height: 150,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          place.name,
+                          style: const TextStyle(
+                            fontFamily: AppTheme.gowunDodum,
+                            fontSize: 22,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: isSaved ? '장소 찜 해제' : '장소 찜하기',
+                        onPressed: () {
+                          ref
+                              .read(savedPlacesProvider.notifier)
+                              .toggle(savedPlace);
+                          setSheetState(() {});
+                        },
+                        icon: Icon(
+                          isSaved
+                              ? Icons.bookmark_rounded
+                              : Icons.bookmark_border_rounded,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                      if (place.scheduledTime case final time?)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.softCoral,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            time,
+                            style: const TextStyle(
+                              color: AppTheme.coral,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (place.address?.isNotEmpty == true) ...[
+                    const SizedBox(height: 6),
                     Text(
-                      '반려동물 동반 정보 제공 장소',
-                      style: TextStyle(
-                        color: AppTheme.primary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      place.address!,
+                      style: const TextStyle(color: AppTheme.textSecondary),
                     ),
                   ],
-                ),
+                  if (place.petFriendly) ...[
+                    const SizedBox(height: 10),
+                    _PetFriendlyInformation(information: petInfo),
+                  ],
+                  if (int.tryParse(place.id) case final contentId?
+                      when contentId > 0) ...[
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _MapCongestionBadge(congestion: congestion),
+                        OutlinedButton.icon(
+                          onPressed: () => _showAccessibility(context, place),
+                          icon: const Icon(Icons.accessible_forward_rounded),
+                          label: const Text('이동 편의 정보'),
+                        ),
+                        _MapAudioGuideButton(audioGuide: audioGuide),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  ExternalMapButtons(
+                    name: place.name,
+                    latitude: place.lat,
+                    longitude: place.lng,
+                  ),
+                ],
               ),
-            ],
-            if (int.tryParse(place.id) case final contentId?
-                when contentId > 0) ...[
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: () => _showAccessibility(context, place),
-                icon: const Icon(Icons.accessible_forward_rounded),
-                label: const Text('이동 편의 정보'),
-              ),
-            ],
-            const SizedBox(height: 18),
-            ExternalMapButtons(
-              name: place.name,
-              latitude: place.lat,
-              longitude: place.lng,
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -420,10 +451,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 );
               }
               final data = snapshot.data;
+              final available = data?['available'] as bool? ?? false;
               final features = (data?['features'] as List<dynamic>? ?? const [])
                   .whereType<Map<String, dynamic>>()
                   .toList(growable: false);
-              if (snapshot.hasError || features.isEmpty) {
+              if (snapshot.hasError || !available || features.isEmpty) {
                 return Text(
                   data?['message'] as String? ?? '제공되는 이동 편의 정보가 없습니다.',
                   style: const TextStyle(color: AppTheme.textSecondary),
@@ -473,6 +505,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _moveToCurrentLocation({bool searchNearby = true}) async {
+    if (!await _ensureLocationPermission()) {
+      if (searchNearby) await _search();
+      return;
+    }
+    if (!mounted) return;
     setState(() => _locating = true);
     try {
       final position = await ref
@@ -492,12 +529,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           context,
         ).showSnackBar(const SnackBar(content: Text('현재 위치 주변을 보여드릴게요.')));
       }
+    } on LocationServiceDisabledException {
+      if (!mounted) return;
+      if (searchNearby) await _search();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('기기의 위치 서비스를 켠 뒤 다시 시도해주세요.')),
+        );
+      }
     } catch (_) {
       if (!mounted) return;
       if (searchNearby) await _search();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('위치 권한을 허용하면 내 주변 장소를 찾을 수 있어요.')),
+          const SnackBar(content: Text('현재 위치를 확인하지 못했어요. 잠시 후 다시 시도해주세요.')),
         );
       }
     } finally {
@@ -519,6 +564,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _confirmArrival(CourseSpot spot) async {
+    if (!await _ensureLocationPermission()) return;
+    if (!mounted) return;
     setState(() => _locating = true);
     try {
       final position = await ref
@@ -563,6 +610,112 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       }
     } finally {
       if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  Future<bool> _ensureLocationPermission() async {
+    final location = ref.read(locationUtilProvider);
+    final status = await location.permissionStatus();
+    if (!mounted) return false;
+    if (status == AppLocationPermission.granted) return true;
+    if (status == AppLocationPermission.deniedForever) {
+      await _showLocationSettingsDialog();
+      return false;
+    }
+
+    final agreed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(
+          Icons.location_on_outlined,
+          color: AppTheme.primary,
+          size: 34,
+        ),
+        title: const Text(
+          '위치 접근 권한 안내',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Chip(
+                avatar: Icon(Icons.check_circle_outline_rounded, size: 17),
+                label: Text(
+                  '선택 권한',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+            SizedBox(height: 12),
+            _PermissionNoticeRow(
+              title: '사용 목적',
+              description: '현재 위치 주변 관광지 안내와 코스 방문·완주 확인',
+            ),
+            SizedBox(height: 12),
+            _PermissionNoticeRow(
+              title: '처리 방식',
+              description: 'GPS 좌표는 기기 안에서 거리 계산에만 사용하며 서버로 전송하거나 저장하지 않아요.',
+            ),
+            SizedBox(height: 12),
+            _PermissionNoticeRow(
+              title: '거부해도 괜찮아요',
+              description: '관광정보·추천 코스·찜은 계속 이용할 수 있고, 주변 정렬과 도착 확인만 제한돼요.',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('나중에'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('동의하고 계속'),
+          ),
+        ],
+      ),
+    );
+    if (agreed != true || !mounted) return false;
+
+    final requested = await location.requestPermission();
+    if (!mounted) return false;
+    if (requested == AppLocationPermission.granted) return true;
+    if (requested == AppLocationPermission.deniedForever) {
+      await _showLocationSettingsDialog();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('위치 권한 없이도 지역별 관광정보를 둘러볼 수 있어요.')),
+      );
+    }
+    return false;
+  }
+
+  Future<void> _showLocationSettingsDialog() async {
+    final openSettings = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('위치 권한이 꺼져 있어요'),
+        content: const Text(
+          '현재 위치 주변 장소와 방문 완료 기능을 사용하려면 앱 설정에서 위치 권한을 허용해주세요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('설정 열기'),
+          ),
+        ],
+      ),
+    );
+    if (openSettings == true) {
+      await ref.read(locationUtilProvider).openAppSettings();
     }
   }
 
@@ -675,72 +828,54 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           SafeArea(
             child: Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.12),
-                          blurRadius: 18,
-                          offset: const Offset(0, 7),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.near_me_rounded,
-                          color: AppTheme.primary,
-                        ),
-                        const SizedBox(width: 11),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                selectedRoute?.title ?? '내 주변 콤보',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              Text(
-                                selectedRoute == null
-                                    ? '현재 위치에서 가까운 여행지를 연결했어요'
-                                    : '선택한 ${selectedRoute.spots.length}곳을 순서대로 연결했어요',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                            ],
+                if (selectedRoute != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 18,
+                            offset: const Offset(0, 7),
                           ),
-                        ),
-                        IconButton(
-                          onPressed: _locating
-                              ? null
-                              : () => _moveToCurrentLocation(
-                                  searchNearby: selectedRoute == null,
-                                ),
-                          tooltip: '현 위치로 이동',
-                          icon: _locating
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.near_me_rounded,
+                            color: AppTheme.primary,
+                          ),
+                          const SizedBox(width: 11),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  selectedRoute.title,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
                                   ),
-                                )
-                              : const Icon(Icons.my_location_rounded),
-                        ),
-                      ],
+                                ),
+                                Text(
+                                  '선택한 ${selectedRoute.spots.length}곳을 순서대로 연결했어요',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
                 if (selectedRoute == null) ...[
                   const SizedBox(height: 10),
                   SizedBox(
@@ -804,6 +939,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       ],
                     ),
                   ),
+                  if (state.petFriendly)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 6, 18, 0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'TourAPI에서 반려동물 동반 정보가 확인된 ${state.places.length}곳만 표시해요.',
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
                 if (selectedRoute == null && state.errorMessage != null) ...[
                   const SizedBox(height: 10),
@@ -899,6 +1049,27 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ],
             ),
           ),
+          if (selectedRoute == null)
+            Positioned(
+              right: 16,
+              bottom: 24,
+              child: SafeArea(
+                child: FloatingActionButton.small(
+                  heroTag: 'current-location',
+                  tooltip: '현 위치로 이동',
+                  onPressed: _locating ? null : () => _moveToCurrentLocation(),
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppTheme.primary,
+                  child: _locating
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.my_location_rounded),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1077,6 +1248,8 @@ class _JourneyControlCard extends StatelessWidget {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: const BorderSide(color: Colors.white38),
+                          minimumSize: const Size(0, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                         ),
                       ),
                     ),
@@ -1097,6 +1270,8 @@ class _JourneyControlCard extends StatelessWidget {
                         style: FilledButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: AppTheme.primary,
+                          minimumSize: const Size(0, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                         ),
                       ),
                     ),
@@ -1145,6 +1320,186 @@ class _ApiErrorBanner extends StatelessWidget {
   );
 }
 
+class _PetFriendlyInformation extends StatelessWidget {
+  const _PetFriendlyInformation({required this.information});
+
+  final Future<Map<String, dynamic>?> information;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>?>(
+    future: information,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Chip(
+          avatar: SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          label: Text('반려동물 동반 정보 확인 중'),
+        );
+      }
+      final data = snapshot.data;
+      final detail = data?['detail'] as String?;
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF7E6),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFF4D79B)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.pets_rounded, size: 18, color: Color(0xFF9B650D)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                detail?.trim().isNotEmpty == true
+                    ? detail!
+                    : '한국관광공사에 등록된 반려동물 동반 장소입니다.',
+                style: const TextStyle(fontSize: 12, height: 1.45),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class _MapCongestionBadge extends StatelessWidget {
+  const _MapCongestionBadge({required this.congestion});
+
+  final Future<Map<String, dynamic>?> congestion;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>?>(
+    future: congestion,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const OutlinedButton(
+          onPressed: null,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 8),
+              Text('혼잡도 확인 중'),
+            ],
+          ),
+        );
+      }
+      final data = snapshot.data;
+      if (snapshot.hasError || data?['available'] != true) {
+        return const SizedBox.shrink();
+      }
+      final level = data?['level'] as String? ?? '정보 제공';
+      final rate = (data?['rate'] as num?)?.toDouble();
+      final label = rate == null
+          ? '예상 혼잡도 · $level'
+          : '예상 혼잡도 · $level ${rate.toStringAsFixed(0)}%';
+      return OutlinedButton.icon(
+        onPressed: () => showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('관광지 예상 혼잡도'),
+            content: Text(
+              '$label\n\n${data?['notice'] ?? '방문 집중률 예측 정보입니다.'}\n'
+              '기준일 ${data?['baseDate'] ?? '-'}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('확인'),
+              ),
+            ],
+          ),
+        ),
+        icon: const Icon(Icons.groups_2_outlined),
+        label: Text(label),
+      );
+    },
+  );
+}
+
+class _MapAudioGuideButton extends StatefulWidget {
+  const _MapAudioGuideButton({required this.audioGuide});
+
+  final Future<Map<String, dynamic>?> audioGuide;
+
+  @override
+  State<_MapAudioGuideButton> createState() => _MapAudioGuideButtonState();
+}
+
+class _MapAudioGuideButtonState extends State<_MapAudioGuideButton> {
+  final _player = AudioPlayer();
+  bool _playing = false;
+  String? _loadedUrl;
+
+  @override
+  void dispose() {
+    unawaited(_player.dispose());
+    super.dispose();
+  }
+
+  Future<void> _toggle(String url) async {
+    try {
+      if (_playing) {
+        await _player.pause();
+      } else {
+        if (_loadedUrl != url) {
+          await _player.setUrl(url);
+          _loadedUrl = url;
+        }
+        await _player.play();
+      }
+      if (mounted) setState(() => _playing = !_playing);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('오디오 해설을 재생하지 못했어요.')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>?>(
+    future: widget.audioGuide,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const OutlinedButton(
+          onPressed: null,
+          child: SizedBox(
+            width: 15,
+            height: 15,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
+      }
+      final url = snapshot.data?['audioUrl'] as String? ?? '';
+      if (url.isEmpty) {
+        return OutlinedButton.icon(
+          onPressed: null,
+          icon: const Icon(Icons.headphones_rounded),
+          label: const Text('오디오 해설 없음'),
+        );
+      }
+      return OutlinedButton.icon(
+        onPressed: () => _toggle(url),
+        icon: Icon(_playing ? Icons.pause_rounded : Icons.headphones_rounded),
+        label: Text(_playing ? '일시정지' : '오디오 해설'),
+      );
+    },
+  );
+}
+
 class _RegionChip extends StatelessWidget {
   const _RegionChip({
     required this.label,
@@ -1177,6 +1532,46 @@ class _RegionChip extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PermissionNoticeRow extends StatelessWidget {
+  const _PermissionNoticeRow({required this.title, required this.description});
+
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Padding(
+        padding: EdgeInsets.only(top: 3),
+        child: Icon(Icons.circle, size: 7, color: AppTheme.accent),
+      ),
+      const SizedBox(width: 9),
+      Expanded(
+        child: Text.rich(
+          TextSpan(
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 13,
+              height: 1.45,
+            ),
+            children: [
+              TextSpan(
+                text: '$title\n',
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              TextSpan(text: description),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 class _FilterChip extends StatelessWidget {
@@ -1251,7 +1646,7 @@ class _RoutePreview extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -1270,7 +1665,7 @@ class _RoutePreview extends StatelessWidget {
             children: [
               const Text(
                 '오늘의 연결 코스',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
               ),
               const Spacer(),
               if (isLoading)
@@ -1289,7 +1684,7 @@ class _RoutePreview extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 13),
+          const SizedBox(height: 6),
           if (places.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
@@ -1300,18 +1695,18 @@ class _RoutePreview extends StatelessWidget {
             )
           else
             SizedBox(
-              height: 68,
+              height: 34,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: places.asMap().entries.expand<Widget>((entry) {
                   final widgets = <Widget>[
                     SizedBox(
-                      width: 96,
-                      child: Column(
+                      width: 118,
+                      child: Row(
                         children: [
                           Container(
-                            width: 30,
-                            height: 30,
+                            width: 24,
+                            height: 24,
                             alignment: Alignment.center,
                             decoration: const BoxDecoration(
                               color: AppTheme.softMint,
@@ -1321,31 +1716,23 @@ class _RoutePreview extends StatelessWidget {
                               '${entry.key + 1}',
                               style: const TextStyle(
                                 color: AppTheme.primary,
+                                fontSize: 10,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            entry.value.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          if (entry.value.formattedDistance
-                              case final distance?)
-                            Text(
-                              distance,
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              entry.value.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                color: AppTheme.accent,
                                 fontSize: 10,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
+                          ),
                         ],
                       ),
                     ),

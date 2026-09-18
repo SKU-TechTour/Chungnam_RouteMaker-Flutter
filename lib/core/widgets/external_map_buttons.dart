@@ -2,8 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../theme/app_theme.dart';
-
 abstract final class ExternalMapLinks {
   static const appId = 'com.techtour.flutterprojects';
 
@@ -116,12 +114,14 @@ class ExternalMapButtons extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: FilledButton.icon(
+          child: OutlinedButton.icon(
             onPressed: () => _openKakao(context),
             icon: const Icon(Icons.location_on_outlined, size: 18),
             label: const Text('카카오맵'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.primary,
+            style: OutlinedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF9A6B00),
+              side: const BorderSide(color: Color(0xFFFFD85A)),
               minimumSize: const Size(0, 48),
               textStyle: const TextStyle(
                 fontSize: 12,
