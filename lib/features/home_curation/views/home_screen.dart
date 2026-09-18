@@ -85,8 +85,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             existing.preferenceSignature ==
                 travelPreferenceSignature(preferences));
 
-    // 기본 코스는 앱 내부 좌표로 즉시 준비한다. 공공데이터 안내 뒤에 네트워크
-    // 추천 요청을 기다리지 않으므로 첫 홈 진입이 서버 상태에 좌우되지 않는다.
+    // 공공데이터 안내를 읽는 동안 API 요청을 먼저 시작한다. 안내 확인 뒤에도
+    // 응답이 남아 있을 때만 진행률 팝업을 이어서 보여준다.
     final pendingLoad = canReuseSession ? null : _loadRegion();
     await _showPublicDataNoticeIfNeeded();
     if (!mounted || pendingLoad == null) return;
