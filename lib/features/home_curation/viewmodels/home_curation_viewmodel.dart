@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutterprojects/core/constants/api_constants.dart';
 import 'package:flutterprojects/core/di/providers.dart';
 import 'package:flutterprojects/core/network/api_exception.dart';
 import 'package:flutterprojects/features/home_curation/models/course.dart';
@@ -39,30 +38,17 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
       clearCourses: true,
     );
     final repository = ref.read(courseRepositoryProvider);
-    if (ApiConstants.useMockData) {
-      final courses = await repository.loadMockCourses(region: region);
-      if (_latestRequestKey != cacheKey) return;
-      state = state.copyWith(
-        courses: courses,
-        currentIndex: 0,
-        isLoading: false,
-      );
-      return;
-    }
-    // 운영 모드에서는 반드시 Spring을 거쳐 실시간 API 경로를 사용합니다.
+
+    // 홈 진입을 막던 무거운 추천 API는 사용하지 않는다. 코스의 기본 동선은
+    // 앱에 포함된 검증 좌표로 즉시 표시하고, TourAPI 실시간 정보는 주변 장소와
+    // 장소 상세 화면에서 필요할 때만 조회한다.
     try {
       if (forceRefresh) _sessionCache.remove(cacheKey);
       final courses =
           _sessionCache[cacheKey] ??
           await _fetchOnce(
             cacheKey,
-            () => repository.fetchCourses(
-              region: region,
-              military: military,
-              journeyType: journeyType,
-              routeTemplate: routeTemplate,
-              concepts: concepts,
-            ),
+            () => repository.loadMockCourses(region: region),
           );
       _validateCourses(courses);
       if (_latestRequestKey != cacheKey) return;
@@ -89,7 +75,6 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
     String? routeTemplate,
     Set<String> concepts = const {},
   }) async {
-    if (ApiConstants.useMockData) return true;
     final cacheKey = _cacheKey(
       region: region,
       military: military,
@@ -102,13 +87,7 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
     try {
       final courses = await _fetchOnce(
         cacheKey,
-        () => repository.fetchCourses(
-          region: region,
-          military: military,
-          journeyType: journeyType,
-          routeTemplate: routeTemplate,
-          concepts: concepts,
-        ),
+        () => repository.loadMockCourses(region: region),
       );
       _validateCourses(courses);
       return true;
@@ -120,7 +99,8 @@ class HomeCurationViewModel extends Notifier<HomeCurationState> {
   }
 
   void _validateCourses(List<Course> courses) {
-    final valid = courses.isNotEmpty &&
+    final valid =
+        courses.isNotEmpty &&
         courses.every(
           (course) =>
               course.spots.length >= 2 &&

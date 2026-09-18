@@ -1,8 +1,137 @@
 [
-  {"id":"n1","region":"NONSAN","title":"입영 전 마음 정리 콤보","indoor":false,"combo":[{"name":"육군훈련소"},{"name":"관촉사"},{"name":"탑정호"}]},
-  {"id":"n2","region":"NONSAN","title":"동행 가족 논산 로컬 콤보","indoor":false,"combo":[{"name":"육군훈련소"},{"name":"강경근대역사문화거리"},{"name":"강경구락부"}]},
-  {"id":"g1","region":"GONGJU","title":"백제 역사 산책 콤보","indoor":false,"combo":[{"name":"무령왕릉과 왕릉원"},{"name":"공산성"},{"name":"베이커리 인화당"}]},
-  {"id":"g2","region":"GONGJU","title":"비 오는 날 공주 콤보","indoor":true,"combo":[{"name":"국립공주박물관"},{"name":"동해원"},{"name":"하루카페&밤떡명가"}]},
-  {"id":"b1","region":"BUYEO","title":"부여 백제 시간여행 콤보","indoor":false,"combo":[{"name":"부소산성"},{"name":"정림사지박물관"},{"name":"궁남지"}]},
-  {"id":"b2","region":"BUYEO","title":"부여 맛과 쉼 콤보","indoor":true,"combo":[{"name":"국립부여박물관"},{"name":"장원막국수"},{"name":"백제향"}]}
+  {
+    "id": "nonsan-local-1", "region": "NONSAN", "title": "논산훈련소와 탑정호 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 18700, "totalDurationSeconds": 16200, "targetArrivalTime": "13:00",
+    "combo": [
+      {"id":"2","name":"관촉사","category":"HERITAGE","latitude":36.1884477,"longitude":127.1130246},
+      {"id":"1","name":"육군훈련소","category":"MILITARY","latitude":36.1119731,"longitude":127.1083526,"scheduledTime":"13:00"},
+      {"id":"3","name":"탑정호","category":"HEALING","latitude":36.1783768,"longitude":127.1798397}
+    ]
+  },
+  {
+    "id": "nonsan-local-2", "region": "NONSAN", "title": "논산 로컬 역사 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 22400, "totalDurationSeconds": 17100, "targetArrivalTime": "13:00",
+    "combo": [
+      {"id":"4","name":"강경구락부","category":"CAFE","latitude":36.1621613,"longitude":127.0156316},
+      {"id":"1","name":"육군훈련소","category":"MILITARY","latitude":36.1119731,"longitude":127.1083526,"scheduledTime":"13:00"},
+      {"id":"2","name":"관촉사","category":"HERITAGE","latitude":36.1884477,"longitude":127.1130246}
+    ]
+  },
+  {
+    "id": "nonsan-local-3", "region": "NONSAN", "title": "탑정호 힐링 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 26900, "totalDurationSeconds": 18000, "targetArrivalTime": "13:00",
+    "combo": [
+      {"id":"3","name":"탑정호","category":"HEALING","latitude":36.1783768,"longitude":127.1798397},
+      {"id":"1","name":"육군훈련소","category":"MILITARY","latitude":36.1119731,"longitude":127.1083526,"scheduledTime":"13:00"},
+      {"id":"4","name":"강경구락부","category":"CAFE","latitude":36.1621613,"longitude":127.0156316}
+    ]
+  },
+  {
+    "id": "nonsan-local-4", "region": "NONSAN", "title": "논산 문화 산책 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 28400, "totalDurationSeconds": 18900, "targetArrivalTime": "13:00",
+    "combo": [
+      {"id":"2","name":"관촉사","category":"HERITAGE","latitude":36.1884477,"longitude":127.1130246},
+      {"id":"4","name":"강경구락부","category":"CAFE","latitude":36.1621613,"longitude":127.0156316},
+      {"id":"1","name":"육군훈련소","category":"MILITARY","latitude":36.1119731,"longitude":127.1083526,"scheduledTime":"13:00"}
+    ]
+  },
+  {
+    "id": "nonsan-local-5", "region": "NONSAN", "title": "논산 핵심 명소 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 30100, "totalDurationSeconds": 19800, "targetArrivalTime": "13:00",
+    "combo": [
+      {"id":"4","name":"강경구락부","category":"CAFE","latitude":36.1621613,"longitude":127.0156316},
+      {"id":"3","name":"탑정호","category":"HEALING","latitude":36.1783768,"longitude":127.1798397},
+      {"id":"1","name":"육군훈련소","category":"MILITARY","latitude":36.1119731,"longitude":127.1083526,"scheduledTime":"13:00"}
+    ]
+  },
+  {
+    "id": "gongju-local-1", "region": "GONGJU", "title": "공주 백제 역사 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 7200, "totalDurationSeconds": 15300,
+    "combo": [
+      {"id":"5","name":"공산성","category":"HERITAGE","latitude":36.4631426,"longitude":127.1264411},
+      {"id":"6","name":"국립공주박물관","category":"HERITAGE","latitude":36.4655287,"longitude":127.1122874},
+      {"id":"7","name":"공주한옥마을","category":"ACCOMMODATION","latitude":36.4647117,"longitude":127.1087143}
+    ]
+  },
+  {
+    "id": "gongju-local-2", "region": "GONGJU", "title": "공주 박물관 탐방 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 16800, "totalDurationSeconds": 17100,
+    "combo": [
+      {"id":"8","name":"석장리박물관","category":"HERITAGE","latitude":36.4476254,"longitude":127.1895492},
+      {"id":"5","name":"공산성","category":"HERITAGE","latitude":36.4631426,"longitude":127.1264411},
+      {"id":"6","name":"국립공주박물관","category":"HERITAGE","latitude":36.4655287,"longitude":127.1122874}
+    ]
+  },
+  {
+    "id": "gongju-local-3", "region": "GONGJU", "title": "공주 고도 산책 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 8200, "totalDurationSeconds": 14400,
+    "combo": [
+      {"id":"7","name":"공주한옥마을","category":"ACCOMMODATION","latitude":36.4647117,"longitude":127.1087143},
+      {"id":"6","name":"국립공주박물관","category":"HERITAGE","latitude":36.4655287,"longitude":127.1122874},
+      {"id":"5","name":"공산성","category":"HERITAGE","latitude":36.4631426,"longitude":127.1264411}
+    ]
+  },
+  {
+    "id": "gongju-local-4", "region": "GONGJU", "title": "공주 가족 여행 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 17900, "totalDurationSeconds": 18000,
+    "combo": [
+      {"id":"6","name":"국립공주박물관","category":"HERITAGE","latitude":36.4655287,"longitude":127.1122874},
+      {"id":"8","name":"석장리박물관","category":"HERITAGE","latitude":36.4476254,"longitude":127.1895492},
+      {"id":"7","name":"공주한옥마을","category":"ACCOMMODATION","latitude":36.4647117,"longitude":127.1087143}
+    ]
+  },
+  {
+    "id": "gongju-local-5", "region": "GONGJU", "title": "공주 핵심 명소 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 19500, "totalDurationSeconds": 18900,
+    "combo": [
+      {"id":"5","name":"공산성","category":"HERITAGE","latitude":36.4631426,"longitude":127.1264411},
+      {"id":"8","name":"석장리박물관","category":"HERITAGE","latitude":36.4476254,"longitude":127.1895492},
+      {"id":"7","name":"공주한옥마을","category":"ACCOMMODATION","latitude":36.4647117,"longitude":127.1087143}
+    ]
+  },
+  {
+    "id": "buyeo-local-1", "region": "BUYEO", "title": "부여 백제 시간여행 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 10400, "totalDurationSeconds": 16200,
+    "combo": [
+      {"id":"9","name":"백제문화단지","category":"HERITAGE","latitude":36.3073820,"longitude":126.9072410},
+      {"id":"10","name":"부소산성","category":"HERITAGE","latitude":36.2892424,"longitude":126.9151865},
+      {"id":"12","name":"정림사지박물관","category":"HERITAGE","latitude":36.2792287,"longitude":126.9151939}
+    ]
+  },
+  {
+    "id": "buyeo-local-2", "region": "BUYEO", "title": "부여 박물관 산책 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 8500, "totalDurationSeconds": 14400,
+    "combo": [
+      {"id":"11","name":"국립부여박물관","category":"HERITAGE","latitude":36.2763114,"longitude":126.9190510},
+      {"id":"12","name":"정림사지박물관","category":"HERITAGE","latitude":36.2792287,"longitude":126.9151939},
+      {"id":"10","name":"부소산성","category":"HERITAGE","latitude":36.2892424,"longitude":126.9151865}
+    ]
+  },
+  {
+    "id": "buyeo-local-3", "region": "BUYEO", "title": "부여 왕도 핵심 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 11300, "totalDurationSeconds": 17100,
+    "combo": [
+      {"id":"10","name":"부소산성","category":"HERITAGE","latitude":36.2892424,"longitude":126.9151865},
+      {"id":"9","name":"백제문화단지","category":"HERITAGE","latitude":36.3073820,"longitude":126.9072410},
+      {"id":"11","name":"국립부여박물관","category":"HERITAGE","latitude":36.2763114,"longitude":126.9190510}
+    ]
+  },
+  {
+    "id": "buyeo-local-4", "region": "BUYEO", "title": "부여 가족 역사 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 9800, "totalDurationSeconds": 15300,
+    "combo": [
+      {"id":"12","name":"정림사지박물관","category":"HERITAGE","latitude":36.2792287,"longitude":126.9151939},
+      {"id":"11","name":"국립부여박물관","category":"HERITAGE","latitude":36.2763114,"longitude":126.9190510},
+      {"id":"9","name":"백제문화단지","category":"HERITAGE","latitude":36.3073820,"longitude":126.9072410}
+    ]
+  },
+  {
+    "id": "buyeo-local-5", "region": "BUYEO", "title": "부여 유산 완주 코스", "source": "LOCAL_CURATED",
+    "totalDistanceMeters": 12100, "totalDurationSeconds": 18000,
+    "combo": [
+      {"id":"11","name":"국립부여박물관","category":"HERITAGE","latitude":36.2763114,"longitude":126.9190510},
+      {"id":"10","name":"부소산성","category":"HERITAGE","latitude":36.2892424,"longitude":126.9151865},
+      {"id":"9","name":"백제문화단지","category":"HERITAGE","latitude":36.3073820,"longitude":126.9072410}
+    ]
+  }
 ]
