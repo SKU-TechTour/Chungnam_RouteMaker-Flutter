@@ -376,6 +376,137 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _refreshRoute();
   }
 
+  Future<void> _avoidCongestion(int index, CourseSpot spot) async {
+    var dialogOpen = true;
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const PopScope(
+          canPop: false,
+          child: AlertDialog(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+                SizedBox(width: 14),
+                Expanded(child: Text('가까운 덜 혼잡한 장소를 찾고 있어요.')),
+              ],
+            ),
+          ),
+        ),
+      ).whenComplete(() => dialogOpen = false),
+    );
+
+    Map<String, dynamic>? data;
+    try {
+      data = await ref
+          .read(courseRepositoryProvider)
+          .fetchCongestionAlternatives(region: _combo.code, spot: spot);
+    } catch (_) {
+      data = null;
+    } finally {
+      if (mounted && dialogOpen) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
+    if (!mounted) return;
+
+    final alternatives = (data?['alternatives'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .where((item) => item['place'] is Map<String, dynamic>)
+        .toList();
+    if (data?['replacementRecommended'] != true || alternatives.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            data?['reason'] as String? ??
+                '혼잡도가 확인된 대체 장소를 찾지 못했어요. 기존 코스를 유지합니다.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '혼잡을 피한 대체 장소',
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                data?['reason'] as String? ?? '',
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 10),
+              ...alternatives.map((item) {
+                final placeJson = item['place'] as Map<String, dynamic>;
+                final parsed = CourseSpot.fromJson(placeJson);
+                final replacement = CourseSpot(
+                  id: parsed.id,
+                  name: parsed.name,
+                  category: parsed.category,
+                  latitude: parsed.latitude,
+                  longitude: parsed.longitude,
+                  imageUrl: parsed.imageUrl,
+                  source: parsed.source,
+                  address: parsed.address,
+                  scheduledTime: spot.scheduledTime,
+                );
+                final rate = (item['congestionRate'] as num?)?.round();
+                final distance = (item['distanceMeters'] as num?)?.round() ?? 0;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const CircleAvatar(
+                    backgroundColor: AppTheme.softMint,
+                    child: Icon(
+                      Icons.alt_route_rounded,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                  title: Text(
+                    replacement.name,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  subtitle: Text(
+                    '${distance >= 1000 ? '${(distance / 1000).toStringAsFixed(1)}km' : '${distance}m'} · 예상 혼잡도 ${rate ?? '-'}%',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _replaceSpot(index, replacement);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '${spot.name} 대신 ${replacement.name}(으)로 바꾸고 이동시간을 다시 계산합니다.',
+                        ),
+                      ),
+                    );
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showAddSpot(List<CourseSpot> candidates) {
     final existing = _editableSpots.map((spot) => spot.id).toSet();
     final available = candidates
@@ -551,6 +682,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     const SizedBox(height: 16),
                   ],
+                  if (liveCourse?.adaptationNotice?.isNotEmpty == true) ...[
+                    _AdaptiveCourseBanner(
+                      message: liveCourse!.adaptationNotice!,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   Row(
                     children: [
                       Expanded(
@@ -664,7 +801,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           category: _categoryLabel(spot.category),
                           spot: spot,
                         ),
-                        congestion: spot.source == 'TOUR_API_REALTIME'
+                        congestion:
+                            spot.source == 'TOUR_API_REALTIME' &&
+                                spot.category == 'HERITAGE'
                             ? ref
                                   .read(courseRepositoryProvider)
                                   .fetchSpotCongestion(
@@ -672,6 +811,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     attractionName: spot.name,
                                   )
                             : Future<Map<String, dynamic>?>.value(null),
+                        onAvoidCongestion:
+                            spot.source == 'TOUR_API_REALTIME' &&
+                                spot.category == 'HERITAGE'
+                            ? () => _avoidCongestion(index, spot)
+                            : null,
                         onDelete: spot.id == '-1' || _editableSpots.length <= 2
                             ? null
                             : () => _removeSpot(index),
@@ -1412,6 +1556,7 @@ class _ComboStep extends StatelessWidget {
     required this.onChanged,
     required this.onInfo,
     required this.congestion,
+    this.onAvoidCongestion,
     this.onDelete,
   });
   final int number;
@@ -1423,6 +1568,7 @@ class _ComboStep extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final VoidCallback onInfo;
   final Future<Map<String, dynamic>?> congestion;
+  final VoidCallback? onAvoidCongestion;
   final VoidCallback? onDelete;
 
   @override
@@ -1525,25 +1671,49 @@ class _ComboStep extends StatelessWidget {
                   if (data?['available'] != true) {
                     return const SizedBox.shrink();
                   }
+                  final rate = (data?['rate'] as num?)?.toDouble() ?? -1;
+                  final high = rate > 70;
                   return Padding(
                     padding: const EdgeInsets.only(top: 5),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.people_alt_outlined,
-                          size: 14,
-                          color: AppTheme.accent,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.people_alt_outlined,
+                              size: 14,
+                              color: high ? AppTheme.coral : AppTheme.accent,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '예상 혼잡도 · ${data?['level']} (${rate.round()}%)',
+                              style: TextStyle(
+                                color: high ? AppTheme.coral : AppTheme.accent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '예상 혼잡도 · ${data?['level']}',
-                          style: const TextStyle(
-                            color: AppTheme.accent,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
+                        if (high && onAvoidCongestion != null)
+                          TextButton.icon(
+                            onPressed: onAvoidCongestion,
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.only(top: 2, right: 8),
+                              minimumSize: const Size(0, 30),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            icon: const Icon(Icons.alt_route_rounded, size: 15),
+                            label: const Text(
+                              '덜 혼잡한 장소 찾기',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   );
@@ -1559,6 +1729,40 @@ class _ComboStep extends StatelessWidget {
             icon: const Icon(Icons.remove_circle_outline_rounded),
             color: AppTheme.textSecondary,
           ),
+      ],
+    ),
+  );
+}
+
+class _AdaptiveCourseBanner extends StatelessWidget {
+  const _AdaptiveCourseBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: BoxDecoration(
+      color: const Color(0xFFEAF0FF),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFCAD7FF)),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.umbrella_rounded, color: Color(0xFF4F6FD8)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            message,
+            style: const TextStyle(
+              color: Color(0xFF304B9A),
+              fontSize: 12,
+              height: 1.4,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
       ],
     ),
   );

@@ -7,6 +7,7 @@ class Course {
     required this.title,
     required this.spots,
     this.weatherTag,
+    this.adaptationNotice,
     this.totalDistanceMeters = 0,
     this.totalDurationSeconds = 0,
     this.source,
@@ -26,6 +27,7 @@ class Course {
       weatherTag:
           json['weather'] as String? ??
           (json['indoor'] == true ? 'RAINY' : 'CLEAR'),
+      adaptationNotice: json['adaptationNotice'] as String?,
       totalDistanceMeters: json['totalDistanceMeters'] as int? ?? 0,
       totalDurationSeconds: json['totalDurationSeconds'] as int? ?? 0,
       source: json['source'] as String?,
@@ -42,6 +44,7 @@ class Course {
   final String title;
   final List<CourseSpot> spots;
   final String? weatherTag;
+  final String? adaptationNotice;
   final int totalDistanceMeters;
   final int totalDurationSeconds;
   final String? source;
