@@ -23,7 +23,7 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 850),
+      duration: const Duration(milliseconds: 650),
     )..forward();
     _fadeAnimation = CurvedAnimation(
       parent: _controller,
@@ -33,7 +33,9 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigate() async {
-    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    // 브랜드 화면은 1초면 충분합니다. 인증/환경설정 복원 때문에 불필요하게
+    // 더 오래 머물지 않고, 1초 뒤 즉시 다음 화면을 결정합니다.
+    await Future<void>.delayed(const Duration(seconds: 1));
     if (!mounted) return;
     final preferences = await SharedPreferences.getInstance();
     if (!mounted) return;
