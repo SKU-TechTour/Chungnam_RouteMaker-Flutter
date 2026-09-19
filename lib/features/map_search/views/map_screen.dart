@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' as fm;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -271,9 +270,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _showPlace(BuildContext context, Place place) {
     final region = ref.read(mapSearchViewModelProvider).region;
     final savedPlace = SavedPlace.fromPlace(place, region);
-    final audioGuide = int.tryParse(place.id) != null
-        ? ref.read(courseRepositoryProvider).fetchAudioGuide(place.name)
-        : Future<Map<String, dynamic>?>.value(null);
     final congestion = int.tryParse(place.id) != null
         ? ref.read(courseRepositoryProvider).fetchSpotCongestion(
             region: region,
@@ -402,7 +398,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           icon: const Icon(Icons.accessible_forward_rounded),
                           label: const Text('이동 편의 정보'),
                         ),
-                        _MapAudioGuideButton(audioGuide: audioGuide),
                       ],
                     ),
                   ],
@@ -1423,78 +1418,6 @@ class _MapCongestionBadge extends StatelessWidget {
         ),
         icon: const Icon(Icons.groups_2_outlined),
         label: Text(label),
-      );
-    },
-  );
-}
-
-class _MapAudioGuideButton extends StatefulWidget {
-  const _MapAudioGuideButton({required this.audioGuide});
-
-  final Future<Map<String, dynamic>?> audioGuide;
-
-  @override
-  State<_MapAudioGuideButton> createState() => _MapAudioGuideButtonState();
-}
-
-class _MapAudioGuideButtonState extends State<_MapAudioGuideButton> {
-  final _player = AudioPlayer();
-  bool _playing = false;
-  String? _loadedUrl;
-
-  @override
-  void dispose() {
-    unawaited(_player.dispose());
-    super.dispose();
-  }
-
-  Future<void> _toggle(String url) async {
-    try {
-      if (_playing) {
-        await _player.pause();
-      } else {
-        if (_loadedUrl != url) {
-          await _player.setUrl(url);
-          _loadedUrl = url;
-        }
-        await _player.play();
-      }
-      if (mounted) setState(() => _playing = !_playing);
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('오디오 해설을 재생하지 못했어요.')));
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>?>(
-    future: widget.audioGuide,
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return const OutlinedButton(
-          onPressed: null,
-          child: SizedBox(
-            width: 15,
-            height: 15,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        );
-      }
-      final url = snapshot.data?['audioUrl'] as String? ?? '';
-      if (url.isEmpty) {
-        return OutlinedButton.icon(
-          onPressed: null,
-          icon: const Icon(Icons.headphones_rounded),
-          label: const Text('오디오 해설 없음'),
-        );
-      }
-      return OutlinedButton.icon(
-        onPressed: () => _toggle(url),
-        icon: Icon(_playing ? Icons.pause_rounded : Icons.headphones_rounded),
-        label: Text(_playing ? '일시정지' : '오디오 해설'),
       );
     },
   );

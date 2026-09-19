@@ -17,7 +17,6 @@ class CourseRepository {
   final Dio _dio;
   final Map<String, Future<Map<String, dynamic>?>> _spotDetailCache = {};
   final Map<String, Future<Map<String, dynamic>?>> _congestionCache = {};
-  final Map<String, Future<Map<String, dynamic>?>> _audioGuideCache = {};
 
   Future<bool> isServerHealthy() async {
     try {
@@ -184,14 +183,6 @@ class CourseRepository {
     '/api/external/tour/congestion',
     {'region': region, 'attractionName': attractionName},
   );
-
-  Future<Map<String, dynamic>?> fetchAudioGuide(String attractionName) =>
-      _cachedEnrichment(
-        _audioGuideCache,
-        attractionName,
-        '/api/external/tour/audio-guide',
-        {'attractionName': attractionName},
-      );
 
   void prefetchSpotCongestion(String region, Iterable<CourseSpot> spots) {
     for (final spot in spots.where(

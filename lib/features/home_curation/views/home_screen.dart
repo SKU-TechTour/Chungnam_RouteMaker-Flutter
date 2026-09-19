@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:just_audio/just_audio.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/di/providers.dart';
@@ -144,9 +143,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const Spacer(),
                 SizedBox(
-                  width: 104,
+                  width: 83,
+                  height: 38,
                   child: FilledButton(
                     onPressed: () => Navigator.pop(dialogContext),
+                    style: FilledButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      textStyle: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     child: const Text('확인'),
                   ),
                 ),
@@ -422,9 +429,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final details = spot != null && spot.source == 'TOUR_API_REALTIME'
         ? ref.read(courseRepositoryProvider).fetchSpotDetails(spot.id)
         : Future<Map<String, dynamic>?>.value(null);
-    final audioGuide = spot != null && spot.source == 'TOUR_API_REALTIME'
-        ? ref.read(courseRepositoryProvider).fetchAudioGuide(spot.name)
-        : Future<Map<String, dynamic>?>.value(null);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -435,7 +439,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         category: category,
         spot: spot,
         details: details,
-        audioGuide: audioGuide,
       ),
     );
   }
@@ -1688,14 +1691,12 @@ class _SpotDetailSheet extends StatelessWidget {
     required this.category,
     required this.spot,
     required this.details,
-    required this.audioGuide,
   });
 
   final String name;
   final String category;
   final CourseSpot? spot;
   final Future<Map<String, dynamic>?> details;
-  final Future<Map<String, dynamic>?> audioGuide;
 
   String _plainText(String value) => value
       .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
@@ -1873,8 +1874,6 @@ class _SpotDetailSheet extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 18),
-          _AudioGuideCard(audioGuide: audioGuide),
           if (spot != null) ...[
             const SizedBox(height: 18),
             ExternalMapButtons(
@@ -1906,176 +1905,6 @@ class _SpotDetailSheet extends StatelessWidget {
           ),
         ],
       ),
-    ),
-  );
-}
-
-class _AudioGuideCard extends StatefulWidget {
-  const _AudioGuideCard({required this.audioGuide});
-
-  final Future<Map<String, dynamic>?> audioGuide;
-
-  @override
-  State<_AudioGuideCard> createState() => _AudioGuideCardState();
-}
-
-class _AudioGuideCardState extends State<_AudioGuideCard> {
-  final AudioPlayer _player = AudioPlayer();
-  String? _loadedUrl;
-  bool _preparing = false;
-  bool _showScript = false;
-
-  @override
-  void dispose() {
-    _player.dispose();
-    super.dispose();
-  }
-
-  Future<void> _toggle(String url) async {
-    if (_player.playing) {
-      await _player.pause();
-      return;
-    }
-    try {
-      if (_loadedUrl != url) {
-        setState(() => _preparing = true);
-        await _player.setUrl(url);
-        _loadedUrl = url;
-      }
-      await _player.play();
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('오디오 해설을 재생하지 못했어요.')));
-      }
-    } finally {
-      if (mounted) setState(() => _preparing = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>?>(
-    future: widget.audioGuide,
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return const _EnrichmentLoadingCard(
-          icon: Icons.headphones_rounded,
-          message: '관광지 오디오 해설을 확인하고 있어요.',
-        );
-      }
-      final data = snapshot.data;
-      final url = data?['audioUrl'] as String? ?? '';
-      if (snapshot.hasError || data?['available'] != true || url.isEmpty) {
-        return const SizedBox.shrink();
-      }
-      final title = data?['title'] as String? ?? '관광지 오디오 해설';
-      final script = data?['script'] as String? ?? '';
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppTheme.softMint,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.headphones_rounded, color: AppTheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-                StreamBuilder<PlayerState>(
-                  stream: _player.playerStateStream,
-                  builder: (context, playerSnapshot) {
-                    final playing = playerSnapshot.data?.playing ?? false;
-                    return IconButton.filled(
-                      tooltip: playing ? '일시정지' : '오디오 해설 재생',
-                      onPressed: _preparing ? null : () => _toggle(url),
-                      icon: _preparing
-                          ? const SizedBox(
-                              width: 17,
-                              height: 17,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Icon(
-                              playing
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                            ),
-                    );
-                  },
-                ),
-              ],
-            ),
-            if (script.isNotEmpty) ...[
-              TextButton.icon(
-                onPressed: () => setState(() => _showScript = !_showScript),
-                icon: Icon(
-                  _showScript
-                      ? Icons.expand_less_rounded
-                      : Icons.subject_rounded,
-                  size: 17,
-                ),
-                label: Text(_showScript ? '해설 원고 접기' : '해설 원고 보기'),
-              ),
-              if (_showScript)
-                Text(
-                  script,
-                  style: const TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
-                    height: 1.55,
-                  ),
-                ),
-            ],
-            const Text(
-              '한국관광공사 오디 오디오 가이드',
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 9),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-class _EnrichmentLoadingCard extends StatelessWidget {
-  const _EnrichmentLoadingCard({required this.icon, required this.message});
-
-  final IconData icon;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: AppTheme.softMint,
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Row(
-      children: [
-        Icon(icon, color: AppTheme.primary),
-        const SizedBox(width: 10),
-        Expanded(child: Text(message, style: const TextStyle(fontSize: 12))),
-        const SizedBox(
-          width: 16,
-          height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      ],
     ),
   );
 }
