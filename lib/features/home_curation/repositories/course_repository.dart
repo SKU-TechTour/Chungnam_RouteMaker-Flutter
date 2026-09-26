@@ -80,7 +80,9 @@ class CourseRepository {
           data: requestData,
           options: Options(
             extra: {'skipFirebaseAuth': true},
-            receiveTimeout: const Duration(seconds: 25),
+            // 백엔드는 공공 API 응답을 최대 40초 기다릴 수 있습니다.
+            // 앱이 그보다 먼저 연결을 끊지 않도록 처리 여유를 둡니다.
+            receiveTimeout: const Duration(seconds: 50),
           ),
         ),
       );
