@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/api_constants.dart';
+import '../../../core/constants/training_center_info.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/external_map_buttons.dart';
@@ -426,7 +427,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     required String category,
     CourseSpot? spot,
   }) {
-    final details = spot != null && spot.source == 'TOUR_API_REALTIME'
+    final details =
+        spot != null &&
+            (spot.source == 'TOUR_API_REALTIME' ||
+                (spot.source == 'CURATED_DEFAULT' &&
+                    (int.tryParse(spot.id) ?? 0) > 0))
         ? ref.read(courseRepositoryProvider).fetchSpotDetails(spot.id)
         : Future<Map<String, dynamic>?>.value(null);
     showModalBottomSheet<void>(
@@ -864,6 +869,7 @@ class _PopularCoursesSectionState
   int _popularProgress = 0;
   bool _popularFinishing = false;
   bool _popularReady = false;
+  int _popularLoadGeneration = 0;
 
   @override
   void dispose() {
@@ -878,7 +884,20 @@ class _PopularCoursesSectionState
       _popularProgressTimer?.cancel();
       return;
     }
-    final cached = ref.read(popularCoursesProvider);
+    _startPopularLoading();
+  }
+
+  void _selectRegion(String region) {
+    if (_selectedRegion == region) return;
+    setState(() => _selectedRegion = region);
+    _startPopularLoading();
+  }
+
+  void _startPopularLoading() {
+    _popularLoadGeneration++;
+    _popularProgressTimer?.cancel();
+    _popularFinishing = false;
+    final cached = ref.read(popularCoursesProvider(_selectedRegion));
     if (cached.hasValue) {
       setState(() {
         _popularProgress = 100;
@@ -886,10 +905,8 @@ class _PopularCoursesSectionState
       });
       return;
     }
-    _popularProgressTimer?.cancel();
     _popularProgress = 0;
     _popularReady = false;
-    _popularFinishing = false;
     _popularProgressTimer = Timer.periodic(const Duration(milliseconds: 90), (
       _,
     ) {
@@ -905,11 +922,12 @@ class _PopularCoursesSectionState
     if (_popularReady || _popularFinishing) return;
     _popularFinishing = true;
     _popularProgressTimer?.cancel();
+    final generation = _popularLoadGeneration;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
+      if (!mounted || generation != _popularLoadGeneration) return;
       setState(() => _popularProgress = 100);
       await Future<void>.delayed(const Duration(milliseconds: 260));
-      if (!mounted) return;
+      if (!mounted || generation != _popularLoadGeneration) return;
       setState(() {
         _popularReady = true;
         _popularFinishing = false;
@@ -920,7 +938,7 @@ class _PopularCoursesSectionState
   @override
   Widget build(BuildContext context) {
     final courses = _expanded
-        ? ref.watch(popularCoursesProvider)
+        ? ref.watch(popularCoursesProvider(_selectedRegion))
         : const AsyncValue<List<SavedCourse>>.loading();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -976,7 +994,7 @@ class _PopularCoursesSectionState
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: Text(
-              '지역 방문자수 50% · 코스 찜 50%를 합산한 순위예요.',
+              '코스 찜 수 기준 · 부족한 자리는 기본 추천으로 채워요.',
               style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
             ),
           ),
@@ -993,8 +1011,7 @@ class _PopularCoursesSectionState
                             label: Center(child: Text(region.$2)),
                             selected: selected,
                             showCheckmark: false,
-                            onSelected: (_) =>
-                                setState(() => _selectedRegion = region.$1),
+                            onSelected: (_) => _selectRegion(region.$1),
                           ),
                         ),
                       );
@@ -1091,7 +1108,9 @@ class _PopularCoursesSectionState
                                           ),
                                         ),
                                         Text(
-                                          '${course.bookmarkCount}명이 찜한 코스',
+                                          course.rankingBasis == '기본 추천 코스'
+                                              ? '기본 추천 코스 · 찜 수 0'
+                                              : '${course.bookmarkCount}명이 찜한 코스',
                                           style: const TextStyle(
                                             color: AppTheme.accent,
                                             fontSize: 10,
@@ -1489,21 +1508,23 @@ class _ComboStep extends StatelessWidget {
               InkWell(
                 onTap: onInfo,
                 borderRadius: BorderRadius.circular(8),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        '소개보기',
-                        style: TextStyle(
+                        options[selectedIndex] == TrainingCenterInfo.name
+                            ? '육군훈련소 정보보기'
+                            : '소개보기',
+                        style: const TextStyle(
                           color: AppTheme.textSecondary,
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      SizedBox(width: 3),
-                      Icon(
+                      const SizedBox(width: 3),
+                      const Icon(
                         Icons.keyboard_arrow_down_rounded,
                         size: 16,
                         color: AppTheme.textSecondary,
@@ -1698,6 +1719,9 @@ class _SpotDetailSheet extends StatelessWidget {
   final CourseSpot? spot;
   final Future<Map<String, dynamic>?> details;
 
+  bool get _isTrainingCenter =>
+      TrainingCenterInfo.isTrainingCenter(spot?.id ?? '', name);
+
   String _plainText(String value) => value
       .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
       .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n')
@@ -1795,85 +1819,118 @@ class _SpotDetailSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          FutureBuilder<Map<String, dynamic>?>(
-            future: details,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return _DelayedDetailLoading(address: spot?.address);
-              }
-              if (snapshot.hasError) {
-                return const _DetailLoadError();
-              }
-              final detail = snapshot.data;
-              final overview = _plainText(detail?['overview'] as String? ?? '');
-              final address = detail?['address'] as String? ?? spot?.address;
-              final telephone = _plainText(
-                detail?['telephone'] as String? ?? '',
-              );
-              final homepageRaw = detail?['homepage'] as String? ?? '';
-              final homepage = _plainText(homepageRaw);
-              final homepageUri = _homepageUri(homepageRaw);
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    overview.isNotEmpty
-                        ? overview
-                        : '한국관광공사 TourAPI 기본 정보에는 이 장소의 장문 소개가 제공되지 않았습니다. 아래 주소와 연락처 등 제공된 정보를 확인해주세요.',
-                    style: const TextStyle(
-                      color: AppTheme.textSecondary,
-                      height: 1.55,
-                    ),
-                  ),
-                  if (address?.isNotEmpty == true) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(
-                          Icons.place_outlined,
-                          size: 17,
-                          color: AppTheme.textSecondary,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            address!,
-                            style: const TextStyle(
-                              color: AppTheme.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (telephone.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    _DetailInfoRow(icon: Icons.phone_outlined, text: telephone),
-                  ],
-                  if (homepage.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    _DetailInfoRow(
-                      icon: Icons.language_rounded,
-                      text: homepage,
-                    ),
-                  ],
-                  if (homepageUri != null) ...[
-                    const SizedBox(height: 16),
-                    FilledButton.tonalIcon(
-                      onPressed: () => _openUri(context, homepageUri),
-                      icon: const Icon(Icons.open_in_new_rounded),
-                      label: const Text('공식 홈페이지 열기'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
+          if (_isTrainingCenter) ...[
+            const Text(
+              '육군훈련소의 입영·방문 안내는 공식 홈페이지에서 확인할 수 있어요.',
+              style: TextStyle(color: AppTheme.textSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 12),
+            const _DetailInfoRow(
+              icon: Icons.markunread_mailbox_outlined,
+              text: '우편 주소: ${TrainingCenterInfo.postalAddress}',
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              '※ 우편 주소는 길찾기 주소가 아니에요. 아래 지도 버튼은 훈련소 위치로 안내합니다.',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.tonalIcon(
+              onPressed: () => _openUri(
+                context,
+                Uri.parse(TrainingCenterInfo.officialGuideUrl),
+              ),
+              icon: const Icon(Icons.open_in_new_rounded),
+              label: const Text('육군훈련소 공식 안내 보기'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+            ),
+          ] else
+            FutureBuilder<Map<String, dynamic>?>(
+              future: details,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return _DelayedDetailLoading(address: spot?.address);
+                }
+                if (snapshot.hasError) {
+                  return const _DetailLoadError();
+                }
+                final detail = snapshot.data;
+                final overview = _plainText(
+                  detail?['overview'] as String? ?? '',
+                );
+                final address = detail?['address'] as String? ?? spot?.address;
+                final telephone = _plainText(
+                  detail?['telephone'] as String? ?? '',
+                );
+                final homepageRaw = detail?['homepage'] as String? ?? '';
+                final homepage = _plainText(homepageRaw);
+                final homepageUri = _homepageUri(homepageRaw);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      overview.isNotEmpty
+                          ? overview
+                          : '한국관광공사 TourAPI 기본 정보에는 이 장소의 장문 소개가 제공되지 않았습니다. 아래 주소와 연락처 등 제공된 정보를 확인해주세요.',
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        height: 1.55,
                       ),
                     ),
+                    if (address?.isNotEmpty == true) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.place_outlined,
+                            size: 17,
+                            color: AppTheme.textSecondary,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              address!,
+                              style: const TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (telephone.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _DetailInfoRow(
+                        icon: Icons.phone_outlined,
+                        text: telephone,
+                      ),
+                    ],
+                    if (homepage.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _DetailInfoRow(
+                        icon: Icons.language_rounded,
+                        text: homepage,
+                      ),
+                    ],
+                    if (homepageUri != null) ...[
+                      const SizedBox(height: 16),
+                      FilledButton.tonalIcon(
+                        onPressed: () => _openUri(context, homepageUri),
+                        icon: const Icon(Icons.open_in_new_rounded),
+                        label: const Text('공식 홈페이지 열기'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
-              );
-            },
-          ),
+                );
+              },
+            ),
           if (spot != null) ...[
             const SizedBox(height: 18),
             ExternalMapButtons(
@@ -1893,7 +1950,11 @@ class _SpotDetailSheet extends StatelessWidget {
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
-                  spot?.source ?? 'TOUR_API_REALTIME',
+                  _isTrainingCenter
+                      ? '육군훈련소 홈페이지 안내'
+                      : spot?.source == 'CURATED_DEFAULT'
+                      ? '기본 추천 장소 · 상세정보는 TourAPI 조회'
+                      : (spot?.source ?? 'TOUR_API_REALTIME'),
                   style: const TextStyle(
                     color: AppTheme.primary,
                     fontSize: 11,

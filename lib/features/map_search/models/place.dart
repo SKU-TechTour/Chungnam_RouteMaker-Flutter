@@ -1,9 +1,10 @@
 import '../../home_curation/models/course.dart';
+import '../../../core/constants/training_center_info.dart';
 
 /// 주변 관광지/식당/카페 모델.
 ///
 /// Spring `POST /api/places/filter` 요청·응답 필드와 매핑합니다.
-enum PlaceType { tourist, restaurant, accommodation, cafe }
+enum PlaceType { tourist, restaurant, accommodation, cafe, trainingCenter }
 
 class Place {
   const Place({
@@ -26,12 +27,18 @@ class Place {
     return Place(
       id: json['id'].toString(),
       name: json['name'] as String,
-      type: switch (category) {
-        'RESTAURANT' => PlaceType.restaurant,
-        'ACCOMMODATION' => PlaceType.accommodation,
-        'CAFE' => PlaceType.cafe,
-        _ => PlaceType.tourist,
-      },
+      type:
+          TrainingCenterInfo.isTrainingCenter(
+            json['id'].toString(),
+            json['name'] as String,
+          )
+          ? PlaceType.trainingCenter
+          : switch (category) {
+              'RESTAURANT' => PlaceType.restaurant,
+              'ACCOMMODATION' => PlaceType.accommodation,
+              'CAFE' => PlaceType.cafe,
+              _ => PlaceType.tourist,
+            },
       lat: (json['latitude'] as num).toDouble(),
       lng: (json['longitude'] as num).toDouble(),
       petFriendly: json['petFriendly'] as bool? ?? false,
@@ -45,12 +52,14 @@ class Place {
   factory Place.fromCourseSpot(CourseSpot spot) => Place(
     id: spot.id,
     name: spot.name,
-    type: switch (spot.category) {
-      'RESTAURANT' => PlaceType.restaurant,
-      'ACCOMMODATION' => PlaceType.accommodation,
-      'CAFE' => PlaceType.cafe,
-      _ => PlaceType.tourist,
-    },
+    type: TrainingCenterInfo.isTrainingCenter(spot.id, spot.name)
+        ? PlaceType.trainingCenter
+        : switch (spot.category) {
+            'RESTAURANT' => PlaceType.restaurant,
+            'ACCOMMODATION' => PlaceType.accommodation,
+            'CAFE' => PlaceType.cafe,
+            _ => PlaceType.tourist,
+          },
     lat: spot.latitude,
     lng: spot.longitude,
     imageUrl: spot.imageUrl,

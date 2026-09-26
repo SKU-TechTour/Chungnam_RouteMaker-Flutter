@@ -12,8 +12,10 @@ final courseBookmarkRepositoryProvider = Provider(
   (ref) => CourseBookmarkRepository(ref.watch(dioProvider)),
 );
 
-final popularCoursesProvider = FutureProvider<List<SavedCourse>>(
-  (ref) => ref.watch(courseBookmarkRepositoryProvider).fetchPopular(limit: 10),
+final popularCoursesProvider = FutureProvider.family<List<SavedCourse>, String>(
+  (ref, region) => ref
+      .watch(courseBookmarkRepositoryProvider)
+      .fetchPopular(region: region, limit: 3),
 );
 
 final savedCoursesProvider =

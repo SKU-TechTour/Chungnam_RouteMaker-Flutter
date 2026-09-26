@@ -27,10 +27,13 @@ class CourseBookmarkRepository {
     );
   }
 
-  Future<List<SavedCourse>> fetchPopular({int limit = 3}) async {
+  Future<List<SavedCourse>> fetchPopular({
+    required String region,
+    int limit = 3,
+  }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/api/courses/popular',
-      queryParameters: {'limit': limit},
+      queryParameters: {'limit': limit, 'region': region},
       options: Options(extra: {'skipFirebaseAuth': true}),
     );
     final data = response.data?['data'];

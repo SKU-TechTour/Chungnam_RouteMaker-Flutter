@@ -63,6 +63,7 @@ class SavedPlace {
     PlaceType.restaurant => '맛집',
     PlaceType.accommodation => '숙소',
     PlaceType.cafe => '카페',
+    PlaceType.trainingCenter => '훈련소',
     PlaceType.tourist => '관광지',
   };
 

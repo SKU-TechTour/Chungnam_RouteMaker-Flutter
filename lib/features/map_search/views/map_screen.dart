@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart' as ll;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/constants/training_center_info.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/location_util.dart';
 import '../../../core/widgets/external_map_buttons.dart';
@@ -270,13 +271,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _showPlace(BuildContext context, Place place) {
     final region = ref.read(mapSearchViewModelProvider).region;
     final savedPlace = SavedPlace.fromPlace(place, region);
-    final congestion = int.tryParse(place.id) != null
-        ? ref.read(courseRepositoryProvider).fetchSpotCongestion(
-            region: region,
-            attractionName: place.name,
-          )
+    final hasTourContentId = (int.tryParse(place.id) ?? 0) > 0;
+    final congestion = hasTourContentId
+        ? ref
+              .read(courseRepositoryProvider)
+              .fetchSpotCongestion(region: region, attractionName: place.name)
         : Future<Map<String, dynamic>?>.value(null);
-    final petInfo = place.petFriendly && int.tryParse(place.id) != null
+    final petInfo = place.petFriendly && hasTourContentId
         ? ref.read(placeRepositoryProvider).fetchPetInfo(place.id)
         : Future<Map<String, dynamic>?>.value(null);
     showModalBottomSheet<void>(
@@ -379,6 +380,29 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     Text(
                       place.address!,
                       style: const TextStyle(color: AppTheme.textSecondary),
+                    ),
+                  ],
+                  if (place.type == PlaceType.trainingCenter) ...[
+                    const SizedBox(height: 10),
+                    const Text(
+                      '우편 주소: ${TrainingCenterInfo.postalAddress}',
+                      style: TextStyle(color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      '우편 주소와 지도 길찾기 위치는 다릅니다.',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => launchUrl(
+                        Uri.parse(TrainingCenterInfo.officialGuideUrl),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                      icon: const Icon(Icons.open_in_new_rounded),
+                      label: const Text('육군훈련소 공식 안내'),
                     ),
                   ],
                   if (place.petFriendly) ...[
@@ -740,7 +764,25 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         ? journey
         : null;
     final places = selectedRoute == null
-        ? state.places
+        ? [
+            ...state.places,
+            if (state.region == 'NONSAN' &&
+                !state.petFriendly &&
+                !state.strollerAccessible &&
+                !state.parking &&
+                !state.movementConvenience &&
+                !state.places.any(
+                  (place) => place.type == PlaceType.trainingCenter,
+                ))
+              const Place(
+                id: '-1',
+                name: TrainingCenterInfo.name,
+                type: PlaceType.trainingCenter,
+                lat: 36.1119731,
+                lng: 127.1083526,
+                address: '충남 논산시 연무읍 득안대로 504',
+              ),
+          ]
         : selectedRoute.spots.map(Place.fromCourseSpot).toList();
     final mappablePlaces = places.where(_hasValidCoordinates).toList();
     final points = mappablePlaces
@@ -800,11 +842,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       final place = entry.value;
                       return fm.Marker(
                         point: ll.LatLng(place.lat, place.lng),
-                        width: 46,
-                        height: 46,
+                        width: 50,
+                        height: 50,
                         child: GestureDetector(
                           onTap: () => _showPlace(context, place),
-                          child: _PlaceMarker(number: entry.key + 1),
+                          child: _PlaceMarker(
+                            place: place,
+                            routeNumber: selectedRoute == null
+                                ? null
+                                : entry.key + 1,
+                          ),
                         ),
                       );
                     }),
@@ -1535,29 +1582,71 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _PlaceMarker extends StatelessWidget {
-  const _PlaceMarker({required this.number});
-  final int number;
+  const _PlaceMarker({required this.place, this.routeNumber});
+
+  final Place place;
+  final int? routeNumber;
 
   @override
-  Widget build(BuildContext context) => Container(
-    alignment: Alignment.center,
-    decoration: BoxDecoration(
-      color: AppTheme.primary,
-      shape: BoxShape.circle,
-      border: Border.all(color: Colors.white, width: 4),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.22),
-          blurRadius: 8,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Text(
-      '$number',
-      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final (color, icon) = switch (place.type) {
+      PlaceType.trainingCenter => (const Color(0xFF8E3A2D), Icons.flag_rounded),
+      PlaceType.restaurant => (AppTheme.coral, Icons.restaurant_rounded),
+      PlaceType.cafe => (const Color(0xFF8064A2), Icons.local_cafe_rounded),
+      PlaceType.accommodation => (AppTheme.warning, Icons.hotel_rounded),
+      PlaceType.tourist => (AppTheme.primary, Icons.account_balance_rounded),
+    };
+    return Tooltip(
+      message: place.name,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.22),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+          if (routeNumber != null)
+            Positioned(
+              top: -1,
+              right: -1,
+              child: Container(
+                width: 19,
+                height: 19,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color, width: 1.5),
+                ),
+                child: Text(
+                  '$routeNumber',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _RoutePreview extends StatelessWidget {
